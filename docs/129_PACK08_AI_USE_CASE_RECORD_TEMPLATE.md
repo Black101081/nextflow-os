@@ -1,114 +1,151 @@
-# Nextflow OS – Pack 08: AI Use Case Record Template
+# Nextflow OS – Pack 08 AI Use Case Record Template
 
 **Document ID:** 129_PACK08_AI_USE_CASE_RECORD_TEMPLATE  
+**Pack:** 08 — Advanced Intelligence, Recommendations and Assistants  
 **Version:** 1.0  
-**Status:** Template  
-**Primary Owner:** Data & Intelligence / Product  
-**Related docs:** 124 Governance, 120 Overview, 121 Use Cases
+**Status:** Draft v1  
+**Primary Owner:** Data & Intelligence / Product / Governance & Risk  
+**Dependent Packs:** 08 Use Cases (121), 08 Feature Layer (122), 08 Model & Logic (123), 08 AI Governance (124), 08 UX Guidelines (125), 08 Operations & Maturity (126)  
 
----
+## 1. Mục tiêu tài liệu
 
-## Hướng dẫn
+Template này chuẩn hoá cách mô tả, review và quản trị một **AI / Intelligence Use Case** trong Nextflow OS.
 
-Mỗi use case AI/Intelligence trên Nextflow OS **bắt buộc** có một bản AI Use Case Record hoàn chỉnh trước khi deploy production. File này là template – copy và điền vào cho từng use case.
+Use case record nên được tạo cho:
+- recommendation use cases;  
+- scoring/ranking models;  
+- assistants/RAG workflows;  
+- AI skills được đóng gói cho marketplace;  
+- bất kỳ logic intelligence nào có business impact rõ hoặc cần governance.
 
----
+## 2. Cách dùng template
 
-## AI USE CASE RECORD
+- Product và Data điền bản nháp đầu tiên.  
+- Governance & Risk dùng bản ghi này để gán risk level và controls.  
+- UX, Engineering và Ops dùng nó để align implementation, rollout và monitoring.  
+- Mỗi use case nên có một record riêng, versioned theo thời gian.
 
-### 1. Thông tin cơ bản
+## 3. Template
 
-| Field | Giá trị |
-|-------|---------|
-| Use Case ID | UC-08-[số thứ tự, ví dụ: 001] |
-| Tên | |
-| Nhóm | A – Risk / B – Prioritization / C – Automation / D – Summarization / E – Forecasting |
-| Owner | |
-| Ngày tạo | |
-| Ngày review gần nhất | |
-| Status | Draft / Review / Approved / Live / Deprecated |
+### A. Identity
 
-### 2. Mô tả use case
+- **Use Case ID:**  
+- **Use Case Name:**  
+- **Pack / Domain:**  
+- **Primary Owner:**  
+- **Contributors:**  
+- **Status:** Proposed / In Review / Pilot / Active / Deprecated  
+- **Current Version:**  
+- **Last Updated:**
 
-**Vấn đề cần giải quyết:**
-> (Mô tả rõ pain point, tại sao cần AI cho use case này)
+### B. Business context
 
-**User/Persona thụ hưởng:**
-> (CSM / Ops Manager / Finance / Leadership / ...)
+- **Problem statement:**  
+- **Users / roles served:**  
+- **Wedge / functional domain:**  
+- **Why this matters now:**  
+- **Decision or action this use case influences:**
 
-**Output của AI:**
-> (Score / Alert / Recommendation card / Draft text / Ranked list / ...)
+### C. Value hypothesis
 
-**UX Surface:**
-> (Dashboard / Side panel / Alert feed / Email notification / ...)
+- **Primary value hypothesis:**  
+- **Expected business outcomes:**  
+- **Expected user outcomes:**  
+- **What gets better if this works:**  
+- **What happens if this does not exist:**
 
-### 3. Dữ liệu và Model
+### D. Inputs and data sources
 
-**Input features:**
-| Feature | Table nguồn | Mô tả ngắn |
-|---------|------------|------------|
-| | | |
+- **Primary source tables/views:**  
+- **Feature tables/views used:**  
+- **Corpus / documents used (if assistant/RAG):**  
+- **Data classes involved:** Operational / PII / Financial / Other  
+- **Cross-tenant data involved?:** Yes / No  
+- **Data freshness requirements:**  
+- **Known data quality risks:**
 
-**Loại logic/model:**
-- [ ] Rule-based
-- [ ] Weighted scoring
-- [ ] ML model (specify): ___
-- [ ] LLM/RAG
+### E. Logic pattern
 
-**Output schema:**
-```
-{
-  "score": float,          // 0-1
-  "label": string,         // Low/Medium/High/Critical
-  "top_factors": [string], // tối đa 3 lý do
-  "recommended_action": string
-}
-```
+- **Use case type:** Recommendation / Scoring / Forecasting / Pattern mining / Assistant / Hybrid  
+- **Logic pattern chosen:** Rules / Scoring model / Similarity / RAG / LLM / Other  
+- **Why this pattern was chosen:**  
+- **Alternative simpler pattern considered:**  
+- **Outputs produced:** Score / label / explanation / summary / checklist / ranking / recommended action
 
-**Freshness / Latency:**
-> (Real-time / Hourly / Daily / On-demand)
+### F. UX surface
 
-### 4. Risk & Governance
+- **Primary UX surface:** Queue view / dashboard tile / side panel / chat / admin tool / other  
+- **When does the user see it:**  
+- **Required explanation in UI:**  
+- **User controls:** dismiss / override / feedback / undo / regenerate  
+- **Copy disclaimers required:**
 
-**Risk Level:** Low / Medium / High / Critical
+### G. Risk and governance
 
-**Lý do phân loại risk:**
-> (Giải thích tại sao chọn mức này)
+- **Risk level:** Low / Medium / High  
+- **Why this risk level applies:**  
+- **Impacted workflows or tiers:**  
+- **Human-in-the-loop required?:** Yes / No  
+- **Auto-action allowed?:** Yes / No  
+- **Approval needed before rollout?:** Product / Governance / Security / Exec / Other  
+- **Applicable guardrails:**  
+- **Relevant policies or docs:**
 
-**Guardrails đã áp dụng:**
-- [ ] UI label "AI-suggested" / "AI-generated draft"
-- [ ] User có thể dismiss/override
-- [ ] Không auto-action không có confirmation
-- [ ] Kill switch được định nghĩa
-- [ ] Monitoring dashboard setup
-- [ ] Feedback mechanism
-- [ ] Legal review (Medium+)
-- [ ] AI Review Board sign-off (High/Critical)
+### H. Evaluation plan
 
-**Kill switch:**
-> (Mô tả cách tắt: feature flag / config key / người có quyền)
+- **Offline metrics:**  
+- **Business what-if evaluation:**  
+- **Pilot success metrics:**  
+- **Online metrics / A/B test metrics:**  
+- **Failure indicators / stop conditions:**  
+- **Bias / fairness checks needed?:**
 
-**Privacy / PII:**
-> (Use case có dùng PII không? Nếu có, consent mechanism là gì?)
+### I. Rollout plan
 
-### 5. Monitoring
+- **Pilot scope:**  
+- **Pilot start/end dates:**  
+- **Rollout phases:**  
+- **Target user groups / tenants:**  
+- **Fallback behavior:**  
+- **Kill switch available?:** Yes / No  
+- **Rollback owner:**
 
-| Metric | Target | Alert threshold |
-|--------|--------|-----------------|
-| Prediction coverage | ≥ 90% | < 85% |
-| Acceptance rate | ≥ 30% | < 20% |
-| False positive rate | ≤ 20% | > 30% |
-| Latency p95 | ≤ 1s | > 2s |
+### J. Monitoring and operations
 
-### 6. Review History
+- **Primary owner after launch:**  
+- **Dashboards / monitoring views:**  
+- **User feedback channels:**  
+- **Incident response path:**  
+- **Retraining or refresh cadence:**  
+- **Versioning approach:**
 
-| Ngày | Reviewer | Kết quả | Ghi chú |
-|------|----------|---------|--------|
-| | | Approved / Approved with conditions / Rejected | |
+### K. Limitations and assumptions
 
-### 7. Liên kết
+- **Known limitations:**  
+- **Assumptions about users or workflows:**  
+- **Scenarios where the output should not be trusted:**  
+- **Open risks / unresolved questions:**
 
-- Feature table: [feat_table_name]
-- Model/rule code: [link to repo]
-- Dashboard: [link]
-- Runbook: [link]
+### L. Decision log
+
+- **Approval date:**  
+- **Approved by:**  
+- **Conditions attached to approval:**  
+- **Next review date:**  
+- **Change history:**
+
+## 4. Review checklist
+
+Một AI Use Case Record được xem là sẵn sàng review khi:
+- problem statement và value hypothesis rõ;  
+- data sources và feature inputs đã xác định;  
+- logic pattern được giải thích và không phức tạp quá mức cần thiết;  
+- risk level, guardrails, UX controls và rollout plan đã được điền;  
+- có metrics để đo thành công và stop conditions nếu thất bại.
+
+## 5. Điều kiện hoàn thành của tài liệu
+
+Template được xem là đạt yêu cầu khi:
+- Product, Data, Governance và Ops đều có thể dùng chung một biểu mẫu;  
+- use case AI mới không cần "tự nghĩ" format mô tả từ đầu;  
+- các records có thể liên kết trực tiếp với docs 121–126 và với marketplace assets nếu cần.

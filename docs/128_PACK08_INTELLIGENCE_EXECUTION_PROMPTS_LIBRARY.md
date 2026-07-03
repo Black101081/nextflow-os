@@ -1,138 +1,156 @@
-# Nextflow OS – Pack 08: Intelligence Execution Prompts Library
+# Nextflow OS – Pack 08 Intelligence Execution Prompts Library
 
 **Document ID:** 128_PACK08_INTELLIGENCE_EXECUTION_PROMPTS_LIBRARY  
+**Pack:** 08 — Advanced Intelligence, Recommendations and Assistants  
 **Version:** 1.0  
 **Status:** Draft v1  
-**Primary Owner:** Product / Data & Intelligence  
-**Related docs:** 121 Use Cases, 127 Summary
+**Primary Owner:** Data & Intelligence / Product / CS / Ops  
+**Dependent Packs:** 07 Analytics Prompts (109), 08 Use Cases (121), 08 Feature Layer (122), 08 Model & Logic (123), 08 AI Governance (124), 08 UX Guidelines (125), 08 Ops & Maturity (126), 08 Summary (127)  
 
----
+## 1. Mục tiêu tài liệu
 
-## Hướng dẫn dùng
+Tài liệu này cung cấp **prompt library thực thi** cho Pack 08 – các câu hỏi, gợi ý và lệnh hành động để CS/Ops/Product/Data sử dụng lớp intelligence (scores, recommendations, assistants) hiệu quả trong công việc hàng ngày.
 
-Các prompts dưới đây dùng để:
-- **Thiết kế** feature, model, rule cho từng use case.
-- **Thực thi** nhanh khi cần prototype hoặc spec nhanh một use case mới.
-- **Review** logic hiện tại với AI assistant.
+Mục tiêu:
+- giúp users biết **hỏi gì** và **sử dụng outputs intelligence thế nào** cho từng use case chính A–E trong 121; [code_file:507]  
+- giúp Product/Data thu thập feedback có cấu trúc để cải thiện models/rules; [code_file:512]  
+- giúp align cách dùng assistants với AI governance & UX guidelines (124, 125). [code_file:510][code_file:511]
 
----
+## 2. Nguyên tắc dùng prompts trong Nextflow OS
 
-## Prompt 1: Thiết kế Feature Layer cho use case mới
+1. **Grounded in data** – mọi prompt nên gắn với dashboards, KPIs, feature layer hoặc records thật, tránh câu hỏi quá chung chung. [code_file:480][code_file:508]  
+2. **Context-first** – luôn nêu rõ queue/tenant/wedge/time range để assistant và models hiểu đúng ngữ cảnh. [code_file:507]  
+3. **Action-oriented** – ưu tiên prompts dẫn tới action: sắp xếp, ưu tiên, điều tra, chuẩn bị cuộc họp… hơn là chỉ "cho tôi xem".  
+4. **Review & judgement** – đối với outputs medium/high-risk, luôn xem prompt như gợi ý để review, không như lệnh auto-act. [code_file:510][code_file:512]  
+5. **Feedback loop** – kết hợp prompts với cơ chế feedback (👍/👎, comments) để Data/Product cải thiện logic. [code_file:511][code_file:512]
 
-```
-Tôi cần thiết kế feature table cho use case [TÊN USE CASE] trong Nextflow OS.
+## 3. Prompts cho nhóm A – Work & SLA Intelligence (A1, A2, A3)
 
-Thông tin:
-- Domain: [CS / Ops / Finance / Leadership]
-- Grain: [per customer per day / per ticket / per account per period]
-- Nguồn data: [liệt kê fact/dim tables từ Pack 07]
-- Use case cần dự đoán/detect: [mô tả ngắn]
+### 3.1 A1 – SLA Risk & Work Prioritization
 
-Hãy đề xuất:
-1. Tên feature table theo convention feat_<domain>_<purpose>
-2. Danh sách 8–15 features với: tên, type, mô tả ngắn
-3. Freshness SLA phù hợp
-4. Các nguồn data cần join
-```
+**Mục tiêu:** ưu tiên xử lý work items có rủi ro SLA cao, với context rõ ràng.
 
----
+**Prompts gợi ý:**
 
-## Prompt 2: Thiết kế Rule cho alert/recommendation
+- "Trong queue [QUEUE_NAME] hôm nay, hãy sắp xếp work theo rủi ro SLA và đề xuất top 20 việc cần xử lý trong 2 giờ tới."  
+- "Cho tôi danh sách các work items có nguy cơ breach SLA trong 1 giờ tới tại wedge [WEDGE] và giải thích ngắn vì sao từng item được coi là high risk."  
+- "So sánh thứ tự ưu tiên hiện tại của tôi với thứ tự ưu tiên theo SLA risk – những work nào tôi đang bỏ lỡ?"  
+- "Trong tuần này, loại công việc nào thường xuyên breach SLA nhất và vì sao? Gợi ý 3 hành động để giảm breaches."  
+- "Nếu tôi xử lý top 10 công việc này trước, ước tính tỷ lệ SLA hit sẽ cải thiện bao nhiêu trong ngày hôm nay?"
 
-```
-Tôi cần viết một rule cho Nextflow OS Intelligence Layer.
+### 3.2 A2 – Queue Load & Staffing Advisor
 
-Use case: [TÊN USE CASE]
-Input features có sẵn: [liệt kê features từ feat_* table]
-Output mong muốn: [alert / recommendation / badge]
-Ngưỡng gợi ý (nếu có): [ví dụ: time_to_breach < 30 phút]
+**Mục tiêu:** dự báo tải queue và gợi ý staffing/routing.
 
-Hãy viết rule theo format:
-IF <conditions>
-THEN <output>
-WITH <priority> và <expiry/duration>
+**Prompts gợi ý:**
 
-Và giải thích lý do chọn ngưỡng đó.
-```
+- "Dự báo load cho queues [Q1, Q2] trong 8 giờ tới, và đề xuất phân bổ nhân sự để giữ SLA ổn định."  
+- "Queue nào có nguy cơ bị quá tải trong 2 ngày tới dựa trên trend 2 tuần qua, và vì sao?"  
+- "Nếu tôi thêm 1 người vào queue [QUEUE_NAME] trong ca chiều, SLA breach rate dự kiến sẽ thay đổi thế nào?"  
+- "Hãy chỉ ra 3 khoảng thời gian cao điểm của queue [QUEUE_NAME] trong tuần trước và gợi ý cách đổi ca hoặc routing."  
+- "Danh sách user nào đang consistently overloaded theo workload index, và có đề xuất chuyển bớt loại work nào cho nhóm khác?"
 
----
+### 3.3 A3 – Exception Pattern & Runbook Assistant
 
-## Prompt 3: Thiết kế Scoring Model
+**Mục tiêu:** điều tra exceptions nhanh hơn, tái dùng kinh nghiệm.
 
-```
-Tôi cần thiết kế scoring model cho [TÊN USE CASE] trên Nextflow OS.
+**Prompts gợi ý:**
 
-Input: features từ [feat_table_name] – [liệt kê features]
-Output: score 0–1, label [Low/Medium/High/Critical]
-Data sẵn có: [mô tả: bao nhiêu tháng lịch sử, bao nhiêu accounts, class imbalance]
+- "Lỗi [EXCEPTION_TYPE] đã xảy ra bao nhiêu lần trong 7 ngày qua và tần suất tăng giảm thế nào?"  
+- "Cho tôi các incidents tương tự với exception [EXCEPTION_ID] trong 30 ngày qua và cách họ đã được xử lý."  
+- "Trích runbook liên quan đến lỗi [EXCEPTION_TYPE] và tóm tắt các bước quan trọng nhất."  
+- "Từ patterns exceptions gần đây, gợi ý 3 automation đơn giản có thể giảm volume manual handling."  
+- "Khi lỗi [EXCEPTION_TYPE] xảy ra trong context [SYSTEM/INTEGRATION], root cause thường là gì?"
 
-Hãy đề xuất:
-1. Loại model phù hợp (rule-based weighted / logistic regression / GBM) và lý do
-2. Feature engineering cần làm nếu có
-3. Threshold cho từng label
-4. Cách giải thích output cho user (SHAP / rule breakdown)
-5. Retrain trigger và cadence
-```
+## 4. Prompts cho nhóm B – Integrations & Data Quality (B1, B2)
 
----
+### 4.1 B1 – Integration Health & Risk Assistant
 
-## Prompt 4: Viết System Prompt cho QBR Copilot
+**Mục tiêu:** giám sát và điều tra sức khỏe integrations.
 
-```
-Tôi cần viết system prompt cho QBR Draft Generator của Nextflow OS.
+**Prompts gợi ý:**
 
-Context:
-- Account: {account_name}, ARR: {arr}, Tier: {tier}
-- Period: {quarter} {year}
-- KPIs: {kpi_summary}
-- Top issues: {top_tickets_summary}
-- NPS: {nps_score} (trend: {nps_trend})
-- Renewal date: {renewal_date}
+- "Liệt kê top 5 integrations có error rate cao nhất tuần này và tóm tắt pattern lỗi chính."  
+- "Integration [INTEGRATION_NAME] có health thay đổi thế nào trong 30 ngày qua – error, latency, timeouts?"  
+- "Có bất kỳ integration nào liên tục gây ra incidents severity cao trong 3 tháng qua không? Gợi ý hành động giảm rủi ro."  
+- "Khi integration [INTEGRATION_NAME] có latency spike, queue/flows nào bị ảnh hưởng nhiều nhất?"  
+- "Đề xuất 3 integrations cần review sớm dựa trên health trend và risk tier." 
 
-Yêu cầu output:
-- Ngôn ngữ: [Tiếng Việt / English]
-- Cấu trúc: Executive Summary, KPIs, Highlights, Risks, Recommendations
-- Tone: Professional, data-driven, constructive
-- Độ dài: ~400–600 words
-- Luôn kết thúc bằng 2–3 recommended actions cụ thể
+### 4.2 B2 – Mapping & Field Suggestion Assistant
 
-Lưu ý: Chỉ dùng data được cung cấp trong context, không bịa số liệu.
-```
+**Mục tiêu:** hỗ trợ mapping fields và phát hiện lỗi mapping.
 
----
+**Prompts gợi ý:**
 
-## Prompt 5: Review AI Use Case Record
+- "Dựa trên những tenants tương tự, mapping phổ biến cho field [FIELD_NAME] là gì?"  
+- "Có lỗi mapping hoặc missing fields nào thường xuyên xuất hiện trong integration [INTEGRATION_NAME]?"  
+- "Gợi ý mapping cho các field mới phát hiện trong payload từ hệ thống [SYSTEM]."  
+- "Cho tôi ví dụ mapping thành công và thất bại liên quan đến [OBJECT_TYPE] để tôi học theo."  
+- "Field nào trong integration [INTEGRATION_NAME] ít được sử dụng hoặc thường gây lỗi, có nên deprecate hoặc rename?"
 
-```
-Hãy review AI Use Case Record sau đây cho Nextflow OS.
+## 5. Prompts cho nhóm C – Customer Health & CS (C1, C2)
 
-[Dán nội dung AI Use Case Record vào đây]
+### 5.1 C1 – Customer Health Score & Driver Insights
 
-Kiểm tra:
-1. Risk level có được phân loại đúng không? (Low/Medium/High/Critical theo framework 124)
-2. Kill switch có được định nghĩa rõ không?
-3. Guardrails có đủ theo checklist 124 không?
-4. Feature inputs có match với feat_* tables trong 122 không?
-5. UX surface có tuân thủ guidelines 125 không?
+**Mục tiêu:** theo dõi health và hiểu driver.
 
-Đưa ra: danh sách gaps cần fix trước khi submit cho AI Review Board.
-```
+**Prompts gợi ý:**
 
----
+- "Danh sách top 20 customers có health score giảm nhiều nhất trong 30 ngày qua và driver chính là gì?"  
+- "Customer [ACCOUNT_NAME] có health score hiện tại là bao nhiêu, thay đổi thế nào trong 6 tháng, và driver chính là gì?"  
+- "Gợi ý 5 khách hàng risk cao nhưng có tiềm năng giữ nếu can thiệp đúng tuần này."  
+- "Những hành vi nào (logins, feature usage, incidents, invoices) đang tương quan mạnh nhất với health giảm?"  
+- "Nếu tăng adoption của [FEATURE] cho nhóm tenants giống [ACCOUNT_NAME], health score dự kiến cải thiện thế nào?"
 
-## Prompt 6: Tóm tắt Account Health
+### 5.2 C2 – CS Assistant for QBR Preparation
 
-```
-Dựa trên dữ liệu sau về account [ACCOUNT_NAME], hãy viết một đoạn tóm tắt account health ngắn gọn (3–5 câu) cho CSM.
+**Mục tiêu:** chuẩn bị QBR nhanh và sâu.
 
-Dữ liệu:
-- Churn score: {score} ({label})
-- Logged in last 30d: {yes/no}
-- Ticket volume 30d: {n} tickets (trend: {trend})
-- NPS: {score} (trend: {trend})
-- Open action items: {n}
-- Days since last CSM touch: {n} ngày
-- Renewal in: {n} ngày
+**Prompts gợi ý:**
 
-Tone: Direct, actionable. Kết thúc bằng 1 suggested next action.
-```
+- "Chuẩn bị bản nháp QBR cho customer [ACCOUNT_NAME] cho kỳ [TIME_RANGE], tập trung vào value delivered và risks."  
+- "Tóm tắt các KPI chính, incident lớn và improvements 6 tháng qua cho [ACCOUNT_NAME]."  
+- "Gợi ý 3 điểm nên tập trung trong QBR tới với [ACCOUNT_NAME] dựa trên health, usage và feedback."  
+- "So sánh performance của [ACCOUNT_NAME] với nhóm customers tương tự và nêu 3 insight chính."  
+- "Viết bản nháp email follow-up sau QBR cho [ACCOUNT_NAME], dựa trên những actions đã agree." 
+
+## 6. Prompts cho nhóm D – Knowledge & SOP Assistants (D1)
+
+**Mục tiêu:** giúp Ops/Support nhanh chóng truy cập SOPs/runbooks/policies.
+
+**Prompts gợi ý:**
+
+- "Quy trình chuẩn để xử lý incident loại [INCIDENT_TYPE] là gì? Tóm tắt trong 5 bước."  
+- "Khi có khách yêu cầu [REQUEST_TYPE], chính sách hiện tại nói gì về quyền hạn và thời gian phản hồi?"  
+- "Tôi mới tham gia team [TEAM_NAME], cho tôi checklist các việc cần làm khi bắt đầu ca trực."  
+- "Tóm tắt runbook cho việc bật/tắt integration [INTEGRATION_NAME] an toàn."  
+- "Có best practice nào cho việc giao tiếp với khách trong tình huống [SCENARIO]?" 
+
+## 7. Prompts cho nhóm E – Automation & Process Improvement (E1)
+
+**Mục tiêu:** tìm cơ hội automation và cải tiến quy trình.
+
+**Prompts gợi ý:**
+
+- "Dựa trên 90 ngày lịch sử, những step nào trong quy trình [PROCESS_NAME] tốn nhiều thời gian manual nhất?"  
+- "Gợi ý 5 candidates cho automation mà có ROI cao nhất trong wedge [WEDGE] hiện tại."  
+- "Những exceptions nào thường xuyên được resolve theo cùng một pattern và có thể được tự động hóa?"  
+- "Đề xuất cải tiến quy trình cho việc xử lý [WORK_TYPE] để giảm rework và SLA breaches."  
+- "Cho tôi ví dụ tenants đã áp dụng automation tương tự và kết quả là gì (nếu có)."
+
+## 8. Prompts để thu thập feedback và cải thiện models
+
+**Prompts internal cho CS/Ops/Product:**
+
+- "Cho tôi danh sách các gợi ý intelligence mà người dùng hay bỏ qua hoặc đánh dấu không hữu ích nhất trong 30 ngày qua."  
+- "Trong use case [USE_CASE_ID], những yếu tố nào thường được users phản hồi là thiếu hoặc chưa đúng?"  
+- "Tổng hợp feedback từ người dùng về SLA risk assistant trong tháng này và đề xuất 3 cải tiến rule/model."  
+- "Trong marketplace, AI skills nào đang có rating thấp nhưng adoption cao, cần ưu tiên cải thiện?"  
+- "Những flows nào có tỉ lệ override cao đối với recommendations – điều này nói gì về model?"
+
+## 9. Điều kiện hoàn thành của tài liệu
+
+Prompt Library được xem là đạt yêu cầu khi:
+- CS/Ops/CSM có thể dùng prompts này trong công việc hàng ngày để kích hoạt intelligence;  
+- Product/Data thấy rõ patterns để thu thập feedback và cải thiện models/rules;  
+- prompts align với AI governance & UX guidelines, không thúc đẩy auto-action mù quáng.

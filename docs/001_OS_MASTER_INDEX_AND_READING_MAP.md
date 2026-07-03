@@ -1,119 +1,186 @@
 # Nextflow OS – Master Index and Reading Map
 
 **Document ID:** 001_OS_MASTER_INDEX_AND_READING_MAP  
+**Scope:** Cross-pack navigation layer for Packs 02–09 and future extensions  
 **Version:** 1.0  
 **Status:** Draft v1  
-**Primary Owner:** Product Leadership / Architecture / PMO  
+**Primary Owner:** Product Leadership / Documentation Ops  
 
-## Cross-pack references
+## 1. Mục tiêu tài liệu
 
-- Xem **000 Global Glossary and Naming Conventions** để tra cứu thuật ngữ chuẩn.
+Tài liệu này là **master index** cho bộ tài liệu Nextflow OS: giúp người đọc biết bộ tài liệu hiện có những pack nào, mỗi pack trả lời câu hỏi gì, nên đọc theo thứ tự nào và ai nên đọc pack nào.
 
-## 1. Mục tiêu
+## 2. Cách dùng tài liệu này
 
-Tài liệu này là **"bản đồ tổng thể"** của Nextflow OS:
+Bạn có thể dùng master index theo ba cách:
+- đọc theo **chiều dọc**: từ nền tảng lõi đến intelligence và ecosystem;  
+- đọc theo **vai trò**: Product, Engineering, Data, Governance, Ecosystem, Tenant Admin;  
+- đọc theo **mục tiêu**: thiết kế platform, vận hành governance, dựng analytics, bật intelligence, mở ecosystem.
 
-- Liệt kê các packs chính (02–09) và câu hỏi mà mỗi pack trả lời.  
-- Chỉ ra các tài liệu "anchor" nên đọc trước.  
-- Đề xuất lộ trình đọc theo **vai trò** và **mục tiêu** (onboard, thiết kế, triển khai, vận hành).  
+## 3. Sơ đồ các pack hiện có
 
-## 2. Danh sách packs chính
+### Pack 02 – Core Platform & Data
 
-| Pack | Tên | Câu hỏi trả lời |
-|------|-----|----------------|
-| 02 | Foundations | Kiến trúc và thiết kế platform core |
-| 03 | Data Foundations | Data platform, ingestion, storage |
-| 04 | Work & Workflow | Model hoá work items, workflows, SLAs |
-| 05 | Governance & Compliance | Policies, controls, audit |
-| 06 | Risk, Incidents & Changes | Quản lý sự cố, rủi ro, thay đổi |
-| 07 | Data, Analytics & Insights | Schema analytics, KPIs, dashboards |
-| 08 | Intelligence, Recommendations & Assistants | Use cases AI, feature layer, governance, UX |
-| 09 | Ecosystem, Marketplace & Extensions | Extension model, catalog, partner program, marketplace |
+Trả lời các câu hỏi nền tảng:
+- tenant, users, roles, permissions là gì;  
+- entities và contracts cốt lõi của OS là gì;  
+- dữ liệu lõi được tổ chức như thế nào.
 
-## 3. Anchor docs nên đọc
+**Nên đọc khi:** thiết kế platform foundations, identity, data contracts, multi-tenancy.
 
-### Nếu cần overview nhanh toàn hệ
+### Pack 03 – Experience & UX
 
-1. `100_PACK07_DATA_ANALYTICS_AND_INSIGHTS_OVERVIEW_AND_STRATEGY.md`  
-2. `120_PACK08_INTELLIGENCE_OVERVIEW_AND_STRATEGY.md`  
-3. `140_PACK09_ECOSYSTEM_AND_MARKETPLACE_OVERVIEW_AND_STRATEGY.md`  
-4. Summary docs:
-   - `107_PACK07_DATA_ANALYTICS_AND_INSIGHTS_SUMMARY_AND_USAGE_GUIDE.md`
-   - `127_PACK08_INTELLIGENCE_SUMMARY_AND_USAGE_GUIDE.md`
-   - `147_PACK09_ECOSYSTEM_MARKETPLACE_AND_EXTENSIONS_SUMMARY_AND_USAGE_GUIDE.md`
-5. Cross-pack:
-   - `000_GLOBAL_GLOSSARY_AND_NAMING_CONVENTIONS.md`
-   - `001_OS_MASTER_INDEX_AND_READING_MAP.md` (tài liệu này)
+Trả lời:
+- trải nghiệm người dùng được tổ chức thành surfaces nào;  
+- navigation, dashboards, panels và admin areas nên xuất hiện ra sao.
 
-## 4. Reading map theo vai trò
+**Nên đọc khi:** thiết kế screens, workflows UX, dashboards surfaces, assistant entry points.
 
-### 4.1 Product Manager / Product Leadership
+### Pack 04 – Orchestration & Work Management
 
-- `100_PACK07_DATA_ANALYTICS_AND_INSIGHTS_OVERVIEW_AND_STRATEGY.md`
-- `120_PACK08_INTELLIGENCE_OVERVIEW_AND_STRATEGY.md`
-- `140_PACK09_ECOSYSTEM_AND_MARKETPLACE_OVERVIEW_AND_STRATEGY.md`
-- `102_PACK07_METRICS_KPIS_AND_DASHBOARDS_BY_ROLE_AND_WEDGE.md`
-- `121_PACK08_INTELLIGENCE_USE_CASES_FOR_SMES.md`
-- `143_PACK09_PARTNER_PROGRAM_AND_TIERS.md`
+Trả lời:
+- work items, queues, routing, SLA, workflows và automation hoạt động thế nào.
 
-### 4.2 Data & Intelligence
+**Nên đọc khi:** xây workflow engine, operational routing, queue management, SLA governance.
 
-- `101_PACK07_DATA_DOMAIN_MODEL_AND_ANALYTICS_SCHEMA.md`
-- `104_PACK07_DATA_POLICIES_QUALITY_AND_GOVERNANCE.md`
-- `122_PACK08_FEATURE_LAYER_AND_SIGNAL_ARCHITECTURE.md`
-- `123_PACK08_MODEL_AND_LOGIC_ARCHITECTURE.md`
-- `124_PACK08_AI_GOVERNANCE_AND_RISK_MANAGEMENT.md`
-- `126_PACK08_INTELLIGENCE_OPERATIONS_AND_MATURITY_MODEL.md`
-- `129_PACK08_AI_USE_CASE_RECORD_TEMPLATE.md`
+### Pack 05 – Integration & Extensibility
 
-### 4.3 CS / Ops / CSM (front-line)
+Trả lời:
+- kết nối với hệ thống ngoài ra sao;  
+- connectors, mappings, pilots, go-live, health & exceptions được govern thế nào.
 
-- `107_PACK07_DATA_ANALYTICS_AND_INSIGHTS_SUMMARY_AND_USAGE_GUIDE.md`
-- `127_PACK08_INTELLIGENCE_SUMMARY_AND_USAGE_GUIDE.md`
-- `147_PACK09_ECOSYSTEM_MARKETPLACE_AND_EXTENSIONS_SUMMARY_AND_USAGE_GUIDE.md`
-- `109_PACK07_ANALYTICS_EXECUTION_PROMPTS_LIBRARY.md`
-- `128_PACK08_INTELLIGENCE_EXECUTION_PROMPTS_LIBRARY.md`
-- `148_PACK09_ECOSYSTEM_AND_MARKETPLACE_EXECUTION_PROMPTS_LIBRARY.md`
+**Anchor docs đã có:** các docs 82–88.
 
-### 4.4 Governance, Risk, Security
+### Pack 06 – Governance & Operations
 
-- `104_PACK07_DATA_POLICIES_QUALITY_AND_GOVERNANCE.md`
-- `124_PACK08_AI_GOVERNANCE_AND_RISK_MANAGEMENT.md`
-- `145_PACK09_MARKETPLACE_OPERATIONS_AND_SLA.md`
-- `146_PACK09_ASSET_LISTING_AND_REVIEW_CHECKLIST.md`
+Trả lời:
+- risk tiers, incidents, changes, BAU routines, SLAs, roles & RACI được định nghĩa thế nào.
 
-### 4.5 Ecosystem / Partnerships / Tenant Admin
+**Anchor docs đã có:** 91–97.
 
-- `140_PACK09_ECOSYSTEM_AND_MARKETPLACE_OVERVIEW_AND_STRATEGY.md`
-- `141_PACK09_EXTENSION_MODEL_AND_RUNTIME.md`
-- `142_PACK09_CATALOG_MODEL_AND_METADATA.md`
-- `143_PACK09_PARTNER_PROGRAM_AND_TIERS.md`
-- `144_PACK09_MARKETPLACE_UX_AND_POLICIES.md`
-- `145_PACK09_MARKETPLACE_OPERATIONS_AND_SLA.md`
-- `146_PACK09_ASSET_LISTING_AND_REVIEW_CHECKLIST.md`
-- `148_PACK09_ECOSYSTEM_AND_MARKETPLACE_EXECUTION_PROMPTS_LIBRARY.md`
+### Pack 07 – Data, Analytics & Insights
 
-## 5. Reading map theo mục tiêu
+Trả lời:
+- data domain model và analytics schema là gì;  
+- KPIs và dashboards chuẩn cho wedges/roles là gì;  
+- self-service analytics, governance, quality, operations vận hành thế nào.
 
-### 5.1 Bật Analytics cho một wedge
+**Anchor docs đã có:** 100, 101, 102, 103, 104, 105, 107, 109.
 
-Đọc: `100`, `101`, `102`, `103`, `104`, `105`, `107`, `109`.  
-Thực thi: thiết lập schema, KPIs, dashboards, self-service, ops & runbook.
+### Pack 08 – Advanced Intelligence, Recommendations and Assistants
 
-### 5.2 Bật Intelligence (AI) cho một wedge
+Trả lời:
+- intelligence use cases nào đáng làm cho SMEs;  
+- feature layer, logic architecture, AI governance, assistant UX, model ops và maturity path ra sao.
 
-Đọc: `120`, `121`, `122`, `123`, `124`, `125`, `126`, `127`, `128`, `129`.  
-Thực thi: chọn use cases, thiết kế feature layer & models, định nghĩa governance & UX, thiết lập monitoring.
+**Anchor docs đã có:** 120, 121, 122, 123, 124, 125, 126, 127.
 
-### 5.3 Mở Ecosystem / Marketplace
+### Pack 09 – Ecosystem, Marketplace and Extensions
 
-Đọc: `140`, `141`, `142`, `143`, `144`, `145`, `146`, `147`, `148`.  
-Thực thi: thiết kế extension model, quản lý catalog & partner, set marketplace policies, review assets, vận hành marketplace.
+Trả lời:
+- extension/app model là gì;  
+- marketplace catalog, partner program, UX, support/SLA và ecosystem governance hoạt động thế nào.
 
-## 6. Điều kiện hoàn thành
+**Anchor docs đã có:** 140, 141, 142, 143, 144, 145, 147.
 
-Master Index được xem là đủ khi:
+## 4. Reading paths theo vai trò
 
-- Mọi pack chính đều có anchor docs rõ.  
-- Mỗi vai trò biết mình nên đọc gì trước.  
-- Mọi doc mới đều được thêm vào phần index tương ứng (Pack, Role, Goal).  
+### 4.1 Product Leadership / Product Managers
+
+Đọc theo thứ tự:
+1. Pack 04 summary / core workflow docs  
+2. Pack 06 summary  
+3. Pack 07 summary & KPI docs  
+4. Pack 08 overview, use cases, UX, summary  
+5. Pack 09 overview, partner/governance, summary
+
+### 4.2 Platform & Engineering
+
+Đọc theo thứ tự:
+1. Pack 02 foundations  
+2. Pack 04 orchestration  
+3. Pack 05 integrations  
+4. Pack 06 governance ops  
+5. Pack 07 schema & operations  
+6. Pack 08 feature layer & logic architecture  
+7. Pack 09 extension model, catalog model, ops
+
+### 4.3 Data & Intelligence
+
+Đọc theo thứ tự:
+1. Pack 07 full set  
+2. Pack 08 full set  
+3. Pack 06 governance docs liên quan risk, incidents, change  
+4. Pack 09 để hiểu marketplace assets và AI skills trong ecosystem
+
+### 4.4 Governance & Risk / Security
+
+Đọc theo thứ tự:
+1. Pack 06 full set  
+2. Pack 07 governance & data policies  
+3. Pack 08 AI governance & ops  
+4. Pack 09 partner program, catalog metadata, ecosystem ops
+
+### 4.5 Ecosystem / Partnerships
+
+Đọc theo thứ tự:
+1. Pack 05 summary  
+2. Pack 06 summary  
+3. Pack 08 AI governance overview  
+4. Pack 09 full set
+
+### 4.6 Tenant Admins / SME Ops Leads
+
+Đọc theo thứ tự:
+1. Pack 06 summary  
+2. Pack 07 dashboard & KPI docs  
+3. Pack 08 summary and usage  
+4. Pack 09 summary and marketplace UX
+
+## 5. Reading paths theo mục tiêu
+
+### Mục tiêu A – Xây nền tảng vận hành cốt lõi
+
+Đọc Packs 02 → 04 → 05 → 06.
+
+### Mục tiêu B – Bật lớp data & analytics
+
+Đọc Pack 07 overview trước, sau đó 101 → 102 → 103 → 104 → 105 → 107.
+
+### Mục tiêu C – Bật lớp intelligence & assistants
+
+Đọc Pack 08 theo thứ tự: 120 → 121 → 122 → 123 → 124 → 125 → 126 → 127.
+
+### Mục tiêu D – Mở ecosystem & marketplace
+
+Đọc Pack 09 theo thứ tự: 140 → 141 → 142 → 143 → 144 → 145 → 147.
+
+## 6. Recommended anchor docs
+
+Nếu cần đọc nhanh toàn hệ, 10 tài liệu nên ưu tiên là:
+1. Pack 06 summary and usage guide  
+2. 100 Pack 07 overview and strategy  
+3. 101 Pack 07 analytics schema  
+4. 102 Pack 07 KPIs and dashboards  
+5. 120 Pack 08 overview and strategy  
+6. 121 Pack 08 intelligence use cases  
+7. 124 Pack 08 AI governance  
+8. 140 Pack 09 overview and strategy  
+9. 141 Pack 09 extension and app model  
+10. 147 Pack 09 summary and usage guide
+
+## 7. Tài liệu bổ trợ cross-pack
+
+Các tài liệu cross-pack nên tồn tại bên cạnh các pack chính:
+- Global Glossary and Naming Conventions  
+- Master Index and Reading Map  
+- AI Use Case Record Template  
+- Asset Listing and Review Checklist  
+- Prompt libraries cho analytics, intelligence và ecosystem
+
+## 8. Điều kiện hoàn thành của tài liệu
+
+Master Index được xem là đạt yêu cầu khi:
+- người đọc mới có thể biết bắt đầu từ đâu;  
+- từng vai trò có reading path rõ;  
+- các pack 05–09 được kết nối thành một hệ mạch lạc thay vì các tài liệu rời.
