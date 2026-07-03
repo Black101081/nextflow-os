@@ -1,0 +1,345 @@
+/* 
+  Nextflow OS - Mobile Field Application Design System
+  Style Strategy: Pure Vanilla CSS, Mobile-First responsive, Dark-theme glassmorphism
+*/
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Premium Dark Theme */
+  --bg-base: #090a0f;
+  --bg-surface: #11131a;
+  --bg-surface-elevated: #181b26;
+  
+  --color-primary: #6366f1; /* Indigo */
+  --color-primary-glow: rgba(99, 102, 241, 0.15);
+  --color-secondary: #10b981; /* Emerald */
+  --color-accent: #f43f5e; /* Rose */
+  --color-warning: #f59e0b; /* Amber */
+  --color-info: #06b6d4; /* Cyan */
+
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #475569;
+
+  --border-color: #222733;
+  --border-color-hover: #333b4e;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-base);
+  color: var(--text-main);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Giả lập thiết bị di động trên màn hình Web Desktop */
+.mobile-device-frame {
+  width: 100%;
+  max-width: 440px;
+  min-height: 100vh;
+  background-color: var(--bg-base);
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+  position: relative;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slideUp var(--transition-normal);
+}
+
+/* Header di động */
+.mobile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  background: rgba(17, 19, 26, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.brand-title {
+  font-size: 18px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #fff, var(--text-muted));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Trạng thái mạng Offline / Online */
+.network-status-bar {
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all var(--transition-normal);
+}
+
+.network-online {
+  background-color: rgba(16, 185, 129, 0.12);
+  color: var(--color-secondary);
+  border-bottom: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.network-offline {
+  background-color: rgba(244, 63, 94, 0.12);
+  color: var(--color-accent);
+  border-bottom: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 1; }
+}
+
+/* Content Container */
+.mobile-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 80px; /* Chừa khoảng trống cho bottom menu hoặc bottom bars */
+}
+
+/* Dashboard Action Cards */
+.menu-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  text-decoration: none;
+  color: var(--text-main);
+}
+
+.menu-card:hover {
+  border-color: var(--border-color-hover);
+  background-color: var(--bg-surface-elevated);
+}
+
+.menu-icon-wrapper {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Large Task Cards for touch interaction */
+.mobile-task-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  position: relative;
+}
+
+.mobile-task-card:active {
+  transform: scale(0.98);
+  background-color: var(--bg-surface-elevated);
+}
+
+.mobile-task-card.active-working {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
+}
+
+/* Form and Fields custom */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.form-input, .form-select, .form-textarea {
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  width: 100%;
+  outline: none;
+  transition: all var(--transition-normal);
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* Buttons for mobile (Large tap area) */
+.btn-mobile {
+  width: 100%;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  transition: all var(--transition-normal);
+}
+
+.btn-mobile-primary {
+  background-color: var(--color-primary);
+  color: #fff;
+}
+
+.btn-mobile-primary:active {
+  background-color: #5254d8;
+}
+
+.btn-mobile-secondary {
+  background-color: var(--bg-surface-elevated);
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+
+.btn-mobile-secondary:active {
+  background-color: var(--border-color-hover);
+}
+
+.btn-mobile-danger {
+  background-color: var(--color-accent);
+  color: #fff;
+}
+
+/* Offline Banner Notification */
+.offline-banner-floating {
+  position: absolute;
+  bottom: 24px;
+  left: 20px;
+  right: 20px;
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  color: var(--color-warning);
+  animation: slideUp var(--transition-normal);
+}
+
+/* Badge component */
+.badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-high { background-color: rgba(244, 63, 94, 0.12); color: var(--color-accent); border: 1px solid rgba(244, 63, 94, 0.2); }
+.badge-medium { background-color: rgba(245, 158, 11, 0.12); color: var(--color-warning); border: 1px solid rgba(245, 158, 11, 0.2); }
+
+.badge-unassigned { background-color: rgba(148, 163, 184, 0.12); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.2); }
+.badge-progress { background-color: rgba(99, 102, 241, 0.12); color: var(--color-primary); border: 1px solid rgba(99, 102, 241, 0.2); }
+.badge-completed { background-color: rgba(16, 185, 129, 0.12); color: var(--color-secondary); border: 1px solid rgba(16, 185, 129, 0.2); }
+
+/* Evidence Camera preview simulator */
+.camera-simulator {
+  width: 100%;
+  height: 180px;
+  background-color: #000;
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  position: relative;
+  overflow: hidden;
+}
+
+.camera-sim-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background-color: rgba(0, 0, 0, 0.6);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-secondary);
+}
+
+.evidence-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
