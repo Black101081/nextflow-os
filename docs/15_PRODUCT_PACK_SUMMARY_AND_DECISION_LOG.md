@@ -6,7 +6,7 @@
 **Status:** Draft v1  
 **Primary Owner:** Product / Platform Architecture / Founder Office  
 **Dependent Packs:** Experience & UX, Architecture & Core Design, Engineering Implementation, Integration & Data, Sales & Enablement  
-**Related Documents:** 10_PRODUCT_OVERVIEW, 11_CAPABILITY_MAP, 12_ENGINE_BOUNDARY_SPECIFICATION, 13_FIRST_WEDGE_CAPABILITY_SLICE, 14_CAPABILITY_ROADMAP_AND_PHASES
+**Related Documents:** 10_PRODUCT_OVERVIEW, 11_CAPABILITY_MAP, 12_ENGINE_BOUNDARY_SPECIFICATION, 13_FIRST_WEDGE_CAPABILITY_SLICE, 14_CAPABILITY_ROADMAP_AND_PHASES, 16_PACK02_CORE_DATABASE_SCHEMA_AND_DDL
 
 ## 1. Mục tiêu tài liệu
 

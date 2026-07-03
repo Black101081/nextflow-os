@@ -26,6 +26,12 @@ Trả lời các câu hỏi nền tảng:
 - entities và contracts cốt lõi của OS là gì;  
 - dữ liệu lõi được tổ chức như thế nào.
 
+**Anchor docs đã có:**
+- **10_PRODUCT_OVERVIEW**: Định nghĩa sản phẩm Nextflow OS.
+- **11_CAPABILITY_MAP**: Sơ đồ phân rã năng lực.
+- **12_ENGINE_BOUNDARY_SPECIFICATION**: Ranh giới của các core engines.
+- **16_PACK02_CORE_DATABASE_SCHEMA_AND_DDL**: Đặc tả database PostgreSQL runtime vận hành.
+
 **Nên đọc khi:** thiết kế platform foundations, identity, data contracts, multi-tenancy.
 
 ### Pack 03 – Experience & UX
