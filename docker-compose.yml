@@ -1,19 +1,60 @@
 version: '3.8'
 
 services:
+  # 1. Cơ sở dữ liệu PostgreSQL runtime
   db:
-    image: postgres:15-alpine
-    container_name: nextflow_postgres_db
-    restart: always
+    image: postgres:latest
+    container_name: nextflow-postgres-db
     environment:
-      POSTGRES_DB: nextflow_core
-      POSTGRES_USER: nf_admin
-      POSTGRES_PASSWORD: nf_secure_password_9981
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nextflow_db
     ports:
       - "5435:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nextflow_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Rust Core Backend API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nextflow-rust-backend
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/nextflow_db
+      - RUST_LOG=info
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # 3. Web Admin Console (Frontend)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nextflow-web-admin
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+  # 4. Mobile Field App Simulator
+  mobile:
+    build:
+      context: ./mobile
+      dockerfile: Dockerfile
+    container_name: nextflow-mobile-simulator
+    ports:
+      - "5174:80"
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:
-    driver: local
