@@ -37,7 +37,11 @@ Nếu Packs 02–06 trả lời "Nextflow là gì, làm gì, được govern & v
 - **104_PACK07_ANALYTICS_GOVERNANCE_AND_DATA_POLICIES**  
   Định nghĩa chính sách data cho layer analytics: phân loại data theo độ nhạy, access model, minimization & masking, retention, sharing/exports, xử lý incidents liên quan analytics data. [code_file:482]
 
-- **105_PACK07_ANALYTICS_OPERATIONS_VERSIONING_AND_QUALITY_PLAYBOOK**  
+- **105_PACK07_ANALYTICS_OPERATIONS_VERSIONING_AND_QUALITY_PLAYBOOK**
+- **106_PACK07_DATABASE_DDL_AND_SCHEMA_CREATION_SQL**
+  Bộ SQL DDL Scripts khởi tạo cấu trúc bảng vật lý trên PostgreSQL/BigQuery.
+- **108_PACK07_DATA_PIPELINE_ETL_AND_INGESTION_SPEC**
+  Đặc tả thiết kế CDC, pipelines ETL/Ingestion dữ liệu.  
   Định nghĩa cách vận hành analytics như một sản phẩm: versioning metrics/datasets/dashboards, testing & validation layers, review cadences, quality dimensions & scorecards, lifecycle và maturity path từ BI nền tảng tới analytics nâng cao. [code_file:494]
 
 ### 2.2 Docs hỗ trợ

@@ -56,6 +56,9 @@ Pack 09 tập trung vào ba câu hỏi:
 - **145_PACK09_ECOSYSTEM_OPERATIONS_SUPPORT_AND_SLA_PLAYBOOK**  
   Playbook vận hành ecosystem: support model (who supports what cho first-party/partner/community assets; types of issues), ticket & incident routing (L1, partner handoff, security/data incidents theo 06–92), SLA expectations (Nextflow vs partner vs community), monitoring & health (fact_asset_install, fact_asset_usage, fact_asset_incident, dashboards cho Ecosystem, Governance, Partners), deprecation & sunsetting (status, comms, migration, EoL), kill switches & safety levers, liên kết với AI governance (AI Use Case Records, AI-specific monitoring & incidents), phân vai Ecosystem/Support/Governance/Product/Engineering/Partners. [code_file:539]
 
+- **149_PACK09_DEVELOPER_QUICKSTART_AND_SDK_GUIDE**  
+  Tài liệu sandbox, SDK reference và submit checklist cho nhà phát triển bên thứ ba.
+
 ## 3. Dùng Pack 09 như thế nào? – theo góc nhìn tenant admin & product/ecosystem
 
 ### 3.1 Đối với tenant admin – sử dụng marketplace an toàn

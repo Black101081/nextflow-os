@@ -50,6 +50,7 @@ Trả lời:
 - connectors, mappings, pilots, go-live, health & exceptions được govern thế nào.
 
 **Anchor docs đã có:** các docs 82–88.
+- **85_PACK05_API_REFERENCE_AND_CONNECTOR_DEVELOPMENT_SPEC**: Đặc tả API chi tiết và Connector Development Guide.
 
 ### Pack 06 – Governance & Operations
 
@@ -66,6 +67,8 @@ Trả lời:
 - self-service analytics, governance, quality, operations vận hành thế nào.
 
 **Anchor docs đã có:** 100, 101, 102, 103, 104, 105, 107, 109.
+- **106_PACK07_DATABASE_DDL_AND_SCHEMA_CREATION_SQL**: SQL Scripts khởi tạo DB vật lý.
+- **108_PACK07_DATA_PIPELINE_ETL_AND_INGESTION_SPEC**: Quy trình CDC & pipelines ETL đồng bộ dữ liệu.
 
 ### Pack 08 – Advanced Intelligence, Recommendations and Assistants
 
@@ -74,6 +77,7 @@ Trả lời:
 - feature layer, logic architecture, AI governance, assistant UX, model ops và maturity path ra sao.
 
 **Anchor docs đã có:** 120, 121, 122, 123, 124, 125, 126, 127.
+- **129B_PACK08_MODEL_PERFORMANCE_TESTING_AND_EVALUATION_METRICS**: Đo lường và đánh giá chất lượng mô hình AI.
 
 ### Pack 09 – Ecosystem, Marketplace and Extensions
 
@@ -82,6 +86,7 @@ Trả lời:
 - marketplace catalog, partner program, UX, support/SLA và ecosystem governance hoạt động thế nào.
 
 **Anchor docs đã có:** 140, 141, 142, 143, 144, 145, 147.
+- **149_PACK09_DEVELOPER_QUICKSTART_AND_SDK_GUIDE**: Tài liệu Sandbox, SDK và App store submission checklist.
 
 ## 4. Reading paths theo vai trò
 
@@ -172,7 +177,8 @@ Nếu cần đọc nhanh toàn hệ, 10 tài liệu nên ưu tiên là:
 ## 7. Tài liệu bổ trợ cross-pack
 
 Các tài liệu cross-pack nên tồn tại bên cạnh các pack chính:
-- Global Glossary and Naming Conventions  
+- Global Glossary and Naming Conventions  - SME End-User Operational Playbook (150)
+- 
 - Master Index and Reading Map  
 - AI Use Case Record Template  
 - Asset Listing and Review Checklist  

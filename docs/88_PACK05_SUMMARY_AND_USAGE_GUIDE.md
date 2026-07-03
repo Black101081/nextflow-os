@@ -43,7 +43,9 @@ Các docs Pack 05 đã được soạn:
 - **83_PACK05_INTEGRATION_ERROR_HANDLING_RETRY_AND_RECONCILIATION_PATTERNS**  
   Phân loại lỗi inbound/outbound, transient/permanent/divergence; patterns retry & idempotency; và flows reconciliation auto/semi-auto/manual.
 
-- **84_PACK05_INTEGRATION_OBSERVABILITY_AND_HEALTH_DASHBOARDS_REQUIREMENTS**  
+- **84_PACK05_INTEGRATION_OBSERVABILITY_AND_HEALTH_DASHBOARDS_REQUIREMENTS**
+- **85_PACK05_API_REFERENCE_AND_CONNECTOR_DEVELOPMENT_SPEC**
+  Đặc tả chi tiết các APIs (OpenAPI/Swagger) và hướng dẫn viết custom Connector.  
   Events, metrics và dashboard requirements để nhìn thấy health integrations theo tenant/integration/endpoint, và để liên kết lỗi integration với work & SLA.
 
 - **86_PACK05_INTEGRATION_CONFIGURATION_AND_POLICY_MODELING_GUIDE**  

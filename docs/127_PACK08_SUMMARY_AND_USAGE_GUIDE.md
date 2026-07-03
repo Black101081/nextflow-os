@@ -52,6 +52,9 @@ Tất cả được xây trên schema & KPIs Pack 07, trong khung governance Pac
 - **126_PACK08_INTELLIGENCE_OPERATIONS_EVALUATION_AND_MATURITY_PLAYBOOK**  
   Playbook vận hành intelligence: lifecycle rules & models, evaluation offline/online & A/B, monitoring & drift detection, rollout & rollback & kill switches, maturity path từ rules-based → scoring & CS intelligence → pattern-driven → advanced predictive. [code_file:494][code_file:507][code_file:508][code_file:509][code_file:510][code_file:512]
 
+- **129B_PACK08_MODEL_PERFORMANCE_TESTING_AND_EVALUATION_METRICS**  
+  Đặc tả đo lường chất lượng mô hình, tập validation datasets, cách phòng chống AI drift.
+
 ## 3. Dùng Pack 08 như thế nào? – theo chu trình triển khai AI use case
 
 ### Bước 1 – Chọn và mô tả use case
