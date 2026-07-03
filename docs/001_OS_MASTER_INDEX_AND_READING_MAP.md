@@ -184,6 +184,7 @@ Nếu cần đọc nhanh toàn hệ, 10 tài liệu nên ưu tiên là:
 
 Các tài liệu cross-pack nên tồn tại bên cạnh các pack chính:
 - **002_OS_PRODUCTION_RULES_AND_DEVELOPMENT_LOG**: Quy tắc sản xuất phần mềm bất biến và Nhật ký phát triển thực tế.
+- **003_OS_PRODUCTION_PHASE_1_IMPLEMENTATION_PLAN**: Kế hoạch sản xuất chi tiết cho Lát cắt năng lực 1.
 - Global Glossary and Naming Conventions  - SME End-User Operational Playbook (150)
 - 
 - Master Index and Reading Map  
