@@ -7,10 +7,11 @@ use axum::{
 use bcrypt::hash;
 use serde::Deserialize;
 use serde_json::json;
-use sqlx::{PgPool, Row};
+use sqlx::Row;
 use uuid::Uuid;
 
 use crate::middleware::tenant_isolation::TenantIsolation;
+use crate::AppState;
 
 // Requests structs
 #[derive(Debug, Deserialize)]
@@ -28,7 +29,7 @@ pub struct SyncUsersRequest {
 }
 
 pub async fn sync_tenant_users(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     tenant: TenantIsolation,
     Path(tenant_id): Path<Uuid>,
     Json(payload): Json<SyncUsersRequest>,
@@ -107,7 +108,7 @@ pub async fn sync_tenant_users(
             .bind(&user.last_name)
             .bind(&role)
             .bind(is_active)
-            .fetch_one(&pool)
+            .fetch_one(&state.pool)
             .await
         {
             Ok(row) => {

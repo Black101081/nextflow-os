@@ -82,6 +82,67 @@ export default function App() {
     return () => clearInterval(interval);
   }, [auth, selectedQueueId]);
 
+  // Real-time WebSocket live updates
+  useEffect(() => {
+    if (!auth) return;
+
+    const ws = new WebSocket('ws://localhost:8000/ws');
+
+    ws.onopen = () => {
+      console.log('[WebSocket Client] Connected to Live Updates Server');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        console.log('[WebSocket Client] Broadcast event received:', msg);
+
+        if (msg.event === 'WORK_ITEM_CREATED') {
+          const newTask = msg.data;
+          setWorkItems(prev => {
+            if (prev.some(t => t.id === newTask.id)) return prev;
+            return [newTask, ...prev];
+          });
+          triggerNotification('success', `Real-time: Có nhiệm vụ mới "${newTask.title}" vừa được tạo!`);
+        } else if (msg.event === 'WORK_ITEM_STATUS_UPDATED') {
+          const updated = msg.data;
+          setWorkItems(prev => prev.map(t => t.id === updated.id ? { ...t, status: updated.status, version: updated.version } : t));
+          setSelectedItem(prev => {
+            if (prev && prev.id === updated.id) {
+              return { ...prev, status: updated.status, version: updated.version };
+            }
+            return prev;
+          });
+          triggerNotification('success', `Real-time: Cập nhật trạng thái nhiệm vụ thành ${updated.status}.`);
+        } else if (msg.event === 'WORK_ITEM_ROUTED') {
+          const routed = msg.data;
+          setWorkItems(prev => prev.map(t => t.id === routed.work_item_id ? { ...t, status: routed.status } : t));
+          setSelectedItem(prev => {
+            if (prev && prev.id === routed.work_item_id) {
+              return { ...prev, status: routed.status };
+            }
+            return prev;
+          });
+          triggerNotification('success', `Real-time: Nhiệm vụ đã được định tuyến.`);
+        }
+      } catch (err) {
+        console.error('Lỗi phân tích WebSocket message:', err);
+      }
+    };
+
+    ws.onerror = (err) => {
+      console.error('[WebSocket Client] Error:', err);
+    };
+
+    ws.onclose = () => {
+      console.log('[WebSocket Client] Disconnected from server');
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [auth]);
+
   const triggerNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);

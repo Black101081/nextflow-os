@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 use sqlx::{PgPool, Row};
 use tokio::net::TcpListener;
 use uuid::Uuid;
+use futures_util::StreamExt;
 
 use nextflow_core_backend::{config::db::init_pool, create_app};
 
@@ -333,4 +334,34 @@ async fn test_all_endpoints() {
         .unwrap();
     assert_eq!(task_check2.get::<String, _>("status"), "UNASSIGNED");
     assert!(task_check2.try_get::<Uuid, _>("assignee_id").is_err());
+
+    // ----------------------------------------------------
+    // TEST WebSocket Real-time Broadcast (Phase 5)
+    // ----------------------------------------------------
+
+    // Test 15: Kết nối WebSocket và nhận event broadcast khi tạo Task mới
+    let ws_url = base_url.replace("http://", "ws://") + "/ws";
+    let (ws_stream, _) = tokio_tungstenite::connect_async(&ws_url).await.unwrap();
+    let (_, mut ws_read) = ws_stream.split();
+
+    // Gọi API tạo mới task để kích hoạt broadcast
+    let test_title = "Nhiệm vụ kiểm định real-time";
+    let _res = client.post(&format!("{}/api/v1/work-items", base_url))
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .header("x-nextflow-api-key", TEST_API_KEY)
+        .json(&json!({
+            "title": test_title,
+            "priority": "LOW",
+            "category": "OPERATIONS"
+        }))
+        .send().await.unwrap();
+
+    // WebSocket Client phải nhận được message JSON báo hiệu
+    if let Some(Ok(tokio_tungstenite::tungstenite::Message::Text(msg_text))) = ws_read.next().await {
+        let parsed_msg: Value = serde_json::from_str(&msg_text).unwrap();
+        assert_eq!(parsed_msg["event"], "WORK_ITEM_CREATED");
+        assert_eq!(parsed_msg["data"]["title"], test_title);
+    } else {
+        panic!("Không nhận được WebSocket broadcast message từ server!");
+    }
 }

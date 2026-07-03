@@ -7,11 +7,12 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sqlx::{PgPool, Row};
+use sqlx::Row;
 use uuid::Uuid;
 
 use crate::middleware::tenant_isolation::TenantIsolation;
 use crate::services::sla::monitor_sla_breaches;
+use crate::AppState;
 
 // Structs cho requests và responses
 #[derive(Debug, Deserialize)]
@@ -44,7 +45,7 @@ pub struct WorkItemResponse {
 
 // Controller logic
 pub async fn create_work_item(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     tenant: TenantIsolation,
     Json(payload): Json<CreateWorkItemRequest>,
 ) -> Result<impl IntoResponse, Response> {
@@ -104,7 +105,7 @@ pub async fn create_work_item(
         .bind(&payload.external_id)
         .bind(metadata)
         .bind(tenant.user_id)
-        .fetch_one(&pool)
+        .fetch_one(&state.pool)
         .await
         .map_err(|err| {
             eprintln!("[WorkItem Controller] DB Insert error: {}", err);
@@ -125,11 +126,23 @@ pub async fn create_work_item(
         version: row.get("version"),
     };
 
+    // Real-time WebSocket Broadcast notification
+    let _ = state.tx.send(json!({
+        "event": "WORK_ITEM_CREATED",
+        "data": {
+            "id": res.id,
+            "title": res.title,
+            "status": res.status,
+            "priority": res.priority,
+            "version": res.version
+        }
+    }).to_string());
+
     Ok((StatusCode::CREATED, Json(res)))
 }
 
 pub async fn get_work_item(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     tenant: TenantIsolation,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, Response> {
@@ -139,7 +152,7 @@ pub async fn get_work_item(
     )
     .bind(id)
     .bind(tenant.tenant_id)
-    .fetch_optional(&pool)
+    .fetch_optional(&state.pool)
     .await
     .map_err(|err| {
         eprintln!("[WorkItem Controller] DB Fetch error: {}", err);
@@ -172,7 +185,7 @@ pub async fn get_work_item(
 }
 
 pub async fn update_work_item_status(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     tenant: TenantIsolation,
     Path(id): Path<Uuid>,
     Json(payload): Json<UpdateStatusRequest>,
@@ -183,7 +196,7 @@ pub async fn update_work_item_status(
     )
     .bind(id)
     .bind(tenant.tenant_id)
-    .fetch_optional(&pool)
+    .fetch_optional(&state.pool)
     .await
     .map_err(|err| {
         eprintln!("[WorkItem Controller] DB Check error: {}", err);
@@ -222,7 +235,7 @@ pub async fn update_work_item_status(
         query_builder.bind(tenant.tenant_id)
     };
 
-    let row = query_builder.fetch_one(&pool).await.map_err(|err| {
+    let row = query_builder.fetch_one(&state.pool).await.map_err(|err| {
         eprintln!("[WorkItem Controller] DB Update error: {}", err);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -237,12 +250,22 @@ pub async fn update_work_item_status(
         "version": row.get::<i32, _>("version")
     });
 
+    // Real-time WebSocket Broadcast notification
+    let _ = state.tx.send(json!({
+        "event": "WORK_ITEM_STATUS_UPDATED",
+        "data": {
+            "id": res["id"],
+            "status": res["status"],
+            "version": res["version"]
+        }
+    }).to_string());
+
     Ok(Json(res))
 }
 
 // API GET /api/v1/work-items/overdue
 pub async fn get_overdue_work_items(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     tenant: TenantIsolation,
 ) -> Result<impl IntoResponse, Response> {
     let query = r#"
@@ -254,7 +277,7 @@ pub async fn get_overdue_work_items(
 
     let rows = sqlx::query(query)
         .bind(tenant.tenant_id)
-        .fetch_all(&pool)
+        .fetch_all(&state.pool)
         .await
         .map_err(|err| {
             eprintln!("[WorkItem Controller] Query overdue error: {}", err);
@@ -282,10 +305,10 @@ pub async fn get_overdue_work_items(
 
 // API POST /api/v1/work-items/trigger-sla
 pub async fn trigger_sla_scan(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     _tenant: TenantIsolation,
 ) -> Result<impl IntoResponse, Response> {
-    let result = monitor_sla_breaches(&pool).await.map_err(|err| {
+    let result = monitor_sla_breaches(&state.pool).await.map_err(|err| {
         eprintln!("[WorkItem Controller] SLA scan error: {}", err);
         (
             StatusCode::INTERNAL_SERVER_ERROR,

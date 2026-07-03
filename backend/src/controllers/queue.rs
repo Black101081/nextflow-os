@@ -6,11 +6,12 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::json;
-use sqlx::{PgPool, Row};
+use sqlx::Row;
 use uuid::Uuid;
 use chrono::Utc;
 
 use crate::middleware::tenant_isolation::TenantIsolation;
+use crate::AppState;
 
 // Requests structs
 #[derive(Debug, Deserialize)]
@@ -36,7 +37,7 @@ pub struct RouteWorkItemRequest {
 
 // Controller Actions
 pub async fn create_queue(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     tenant: TenantIsolation,
     Json(payload): Json<CreateQueueRequest>,
 ) -> Result<impl IntoResponse, Response> {
@@ -54,7 +55,7 @@ pub async fn create_queue(
     // Kiểm tra trùng ID
     let check_opt = sqlx::query("SELECT id FROM nf_core.queues WHERE id = $1")
         .bind(&payload.id)
-        .fetch_optional(&pool)
+        .fetch_optional(&state.pool)
         .await
         .map_err(|_| {
             (
@@ -91,7 +92,7 @@ pub async fn create_queue(
         .bind(&payload.category)
         .bind(routing_algo)
         .bind(sla_target)
-        .fetch_one(&pool)
+        .fetch_one(&state.pool)
         .await
         .map_err(|err| {
             eprintln!("[Queue Controller] DB Insert error: {}", err);
@@ -114,7 +115,7 @@ pub async fn create_queue(
 }
 
 pub async fn add_queue_member(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     tenant: TenantIsolation,
     Path(id): Path<String>,
     Json(payload): Json<AddMemberRequest>,
@@ -123,7 +124,7 @@ pub async fn add_queue_member(
     let queue_opt = sqlx::query("SELECT id FROM nf_core.queues WHERE id = $1 AND tenant_id = $2")
         .bind(&id)
         .bind(tenant.tenant_id)
-        .fetch_optional(&pool)
+        .fetch_optional(&state.pool)
         .await
         .map_err(|_| {
             (
@@ -145,7 +146,7 @@ pub async fn add_queue_member(
     let user_opt = sqlx::query("SELECT id FROM nf_core.users WHERE id = $1 AND tenant_id = $2")
         .bind(payload.user_id)
         .bind(tenant.tenant_id)
-        .fetch_optional(&pool)
+        .fetch_optional(&state.pool)
         .await
         .map_err(|_| {
             (
@@ -170,7 +171,7 @@ pub async fn add_queue_member(
     sqlx::query("INSERT INTO nf_core.queue_members (queue_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
         .bind(&id)
         .bind(payload.user_id)
-        .execute(&pool)
+        .execute(&state.pool)
         .await
         .map_err(|_| {
             (
@@ -186,11 +187,22 @@ pub async fn add_queue_member(
         "status": "ADDED"
     });
 
+        // Real-time WebSocket Broadcast notification
+    let _ = state.tx.send(json!({
+        "event": "WORK_ITEM_ROUTED",
+        "data": {
+            "work_item_id": res["work_item_id"],
+            "routed_to_queue": res["routed_to_queue"],
+            "assigned_to": res["assigned_to"],
+            "status": res["status"]
+        }
+    }).to_string());
+
     Ok(Json(res))
 }
 
 pub async fn get_queue_members(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     tenant: TenantIsolation,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, Response> {
@@ -198,7 +210,7 @@ pub async fn get_queue_members(
     let queue_opt = sqlx::query("SELECT id, name FROM nf_core.queues WHERE id = $1 AND tenant_id = $2")
         .bind(&id)
         .bind(tenant.tenant_id)
-        .fetch_optional(&pool)
+        .fetch_optional(&state.pool)
         .await
         .map_err(|_| {
             (
@@ -226,7 +238,7 @@ pub async fn get_queue_members(
     let rows = sqlx::query(members_query)
         .bind(&id)
         .bind(tenant.tenant_id)
-        .fetch_all(&pool)
+        .fetch_all(&state.pool)
         .await
         .map_err(|_| {
             (
@@ -252,11 +264,22 @@ pub async fn get_queue_members(
         "members": members
     });
 
+        // Real-time WebSocket Broadcast notification
+    let _ = state.tx.send(json!({
+        "event": "WORK_ITEM_ROUTED",
+        "data": {
+            "work_item_id": res["work_item_id"],
+            "routed_to_queue": res["routed_to_queue"],
+            "assigned_to": res["assigned_to"],
+            "status": res["status"]
+        }
+    }).to_string());
+
     Ok(Json(res))
 }
 
 pub async fn route_work_item(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     tenant: TenantIsolation,
     Path(id): Path<Uuid>,
     Json(payload): Json<RouteWorkItemRequest>,
@@ -265,7 +288,7 @@ pub async fn route_work_item(
     let task_opt = sqlx::query("SELECT id FROM nf_core.work_items WHERE id = $1 AND tenant_id = $2")
         .bind(id)
         .bind(tenant.tenant_id)
-        .fetch_optional(&pool)
+        .fetch_optional(&state.pool)
         .await
         .map_err(|_| {
             (
@@ -288,7 +311,7 @@ pub async fn route_work_item(
         let q_opt = sqlx::query("SELECT id FROM nf_core.queues WHERE id = $1 AND tenant_id = $2")
             .bind(q_id)
             .bind(tenant.tenant_id)
-            .fetch_optional(&pool)
+            .fetch_optional(&state.pool)
             .await
             .map_err(|_| {
                 (
@@ -314,7 +337,7 @@ pub async fn route_work_item(
         let u_opt = sqlx::query("SELECT id FROM nf_core.users WHERE id = $1 AND tenant_id = $2")
             .bind(u_id)
             .bind(tenant.tenant_id)
-            .fetch_optional(&pool)
+            .fetch_optional(&state.pool)
             .await
             .map_err(|_| {
                 (
@@ -365,7 +388,7 @@ pub async fn route_work_item(
     }
     query_builder = query_builder.bind(tenant.tenant_id);
 
-    let row = query_builder.fetch_one(&pool).await.map_err(|err| {
+    let row = query_builder.fetch_one(&state.pool).await.map_err(|err| {
         eprintln!("[Queue Controller] Route update error: {}", err);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -381,6 +404,17 @@ pub async fn route_work_item(
         "status": row.get::<String, _>("status"),
         "routed_at": Utc::now().to_rfc3339()
     });
+
+        // Real-time WebSocket Broadcast notification
+    let _ = state.tx.send(json!({
+        "event": "WORK_ITEM_ROUTED",
+        "data": {
+            "work_item_id": res["work_item_id"],
+            "routed_to_queue": res["routed_to_queue"],
+            "assigned_to": res["assigned_to"],
+            "status": res["status"]
+        }
+    }).to_string());
 
     Ok(Json(res))
 }
