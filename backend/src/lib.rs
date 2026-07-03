@@ -1,6 +1,7 @@
 pub mod config;
 pub mod controllers;
 pub mod middleware;
+pub mod services;
 
 use axum::routing::{get, patch, post};
 use tower_http::cors::{Any, CorsLayer};
@@ -8,7 +9,7 @@ use tower_http::cors::{Any, CorsLayer};
 use crate::controllers::{
     queue::{add_queue_member, create_queue, get_queue_members, route_work_item},
     tenant::sync_tenant_users,
-    work_item::{create_work_item, get_work_item, update_work_item_status},
+    work_item::{create_work_item, get_work_item, update_work_item_status, get_overdue_work_items, trigger_sla_scan},
 };
 
 pub fn create_app(pool: sqlx::PgPool) -> axum::Router {
@@ -25,6 +26,8 @@ pub fn create_app(pool: sqlx::PgPool) -> axum::Router {
             }))
         }))
         .route("/api/v1/work-items", post(create_work_item))
+        .route("/api/v1/work-items/overdue", get(get_overdue_work_items))
+        .route("/api/v1/work-items/trigger-sla", post(trigger_sla_scan))
         .route("/api/v1/work-items/:id", get(get_work_item))
         .route("/api/v1/work-items/:id/status", patch(update_work_item_status))
         .route("/api/v1/work-items/:id/route", post(route_work_item))

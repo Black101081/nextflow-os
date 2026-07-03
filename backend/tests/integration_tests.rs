@@ -252,4 +252,85 @@ async fn test_all_endpoints() {
         .unwrap();
     assert_eq!(user_check.get::<String, _>("role"), "FIELD_WORKER");
     assert_eq!(user_check.get::<bool, _>("is_active"), true);
+
+    // ----------------------------------------------------
+    // TEST SLA Management & Escalation Engine (Phase 4)
+    // ----------------------------------------------------
+
+    // Test 13: SLA Overdue Breach & Auto-Escalation
+    // Tạo 1 task và ép buộc chỉnh due_at về quá khứ
+    let overdue_task_title = "Bảo trì khẩn cấp máy chủ chi nhánh";
+    let insert_overdue = sqlx::query(
+        "INSERT INTO nf_core.work_items (tenant_id, title, status, priority, due_at, queue_id, source)
+         VALUES ($1, $2, 'UNASSIGNED', 'MEDIUM', CURRENT_TIMESTAMP - INTERVAL '1 hour', 'q_test_queue', 'TEST')
+         RETURNING id"
+    )
+    .bind(Uuid::parse_str(TEST_TENANT_ID).unwrap())
+    .bind(overdue_task_title)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let overdue_id: Uuid = insert_overdue.get("id");
+
+    // Kích hoạt quét SLA thủ công qua API
+    let res = client.post(&format!("{}/api/v1/work-items/trigger-sla", base_url))
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .header("x-nextflow-api-key", TEST_API_KEY)
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let scan_res: Value = res.json().await.unwrap();
+    assert!(scan_res["breached_count"].as_u64().unwrap() >= 1);
+
+    // Kiểm tra task đã được chuyển sang hàng đợi escalation_queue và nâng priority lên HIGH
+    let task_check = sqlx::query("SELECT queue_id, priority FROM nf_core.work_items WHERE id = $1")
+        .bind(overdue_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(task_check.get::<String, _>("queue_id"), "q_escalation_queue");
+    assert_eq!(task_check.get::<String, _>("priority"), "HIGH");
+
+    // Lấy danh sách overdue qua API
+    let res = client.get(&format!("{}/api/v1/work-items/overdue", base_url))
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .header("x-nextflow-api-key", TEST_API_KEY)
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let overdue_list: Value = res.json().await.unwrap();
+    let items = overdue_list["overdue_items"].as_array().unwrap();
+    assert!(items.iter().any(|item| item["title"] == overdue_task_title));
+
+    // Test 14: Operator Hold Timeout & Auto-Reassignment
+    // Tạo 1 task đang IN_PROGRESS và ép started_at lùi lại quá Target SLA (3600 giây)
+    let timeout_task_title = "Xử lý hồ sơ hoàn thuế quý 4";
+    let insert_timeout = sqlx::query(
+        "INSERT INTO nf_core.work_items (tenant_id, title, status, priority, started_at, assignee_id, queue_id, source)
+         VALUES ($1, $2, 'IN_PROGRESS', 'MEDIUM', CURRENT_TIMESTAMP - INTERVAL '2 hours', $3, 'q_test_queue', 'TEST')
+         RETURNING id"
+    )
+    .bind(Uuid::parse_str(TEST_TENANT_ID).unwrap())
+    .bind(timeout_task_title)
+    .bind(Uuid::parse_str(TEST_USER_ID).unwrap())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let timeout_id: Uuid = insert_timeout.get("id");
+
+    // Kích hoạt quét SLA thủ công qua API một lần nữa
+    let res = client.post(&format!("{}/api/v1/work-items/trigger-sla", base_url))
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .header("x-nextflow-api-key", TEST_API_KEY)
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let scan_res2: Value = res.json().await.unwrap();
+    assert!(scan_res2["reassigned_count"].as_u64().unwrap() >= 1);
+
+    // Kiểm tra task đã được thu hồi về UNASSIGNED, gán assignee_id = null
+    let task_check2 = sqlx::query("SELECT status, assignee_id FROM nf_core.work_items WHERE id = $1")
+        .bind(timeout_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(task_check2.get::<String, _>("status"), "UNASSIGNED");
+    assert!(task_check2.try_get::<Uuid, _>("assignee_id").is_err());
 }

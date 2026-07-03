@@ -11,6 +11,7 @@ use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 use crate::middleware::tenant_isolation::TenantIsolation;
+use crate::services::sla::monitor_sla_breaches;
 
 // Structs cho requests và responses
 #[derive(Debug, Deserialize)]
@@ -237,4 +238,61 @@ pub async fn update_work_item_status(
     });
 
     Ok(Json(res))
+}
+
+// API GET /api/v1/work-items/overdue
+pub async fn get_overdue_work_items(
+    State(pool): State<PgPool>,
+    tenant: TenantIsolation,
+) -> Result<impl IntoResponse, Response> {
+    let query = r#"
+        SELECT id, title, status, priority, created_at, due_at, version
+        FROM nf_core.work_items
+        WHERE tenant_id = $1 AND due_at < CURRENT_TIMESTAMP AND status NOT IN ('COMPLETED', 'CANCELLED')
+        ORDER BY due_at ASC
+    "#;
+
+    let rows = sqlx::query(query)
+        .bind(tenant.tenant_id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|err| {
+            eprintln!("[WorkItem Controller] Query overdue error: {}", err);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": { "code": "SYSTEM_FAULT", "message": "Lỗi máy chủ." } })),
+            )
+                .into_response()
+        })?;
+
+    let items: Vec<Value> = rows.into_iter().map(|row| {
+        json!({
+            "id": row.get::<Uuid, _>("id"),
+            "title": row.get::<String, _>("title"),
+            "status": row.get::<String, _>("status"),
+            "priority": row.get::<String, _>("priority"),
+            "created_at": row.get::<chrono::DateTime<Utc>, _>("created_at"),
+            "due_at": row.get::<Option<chrono::DateTime<Utc>>, _>("due_at"),
+            "version": row.get::<i32, _>("version")
+        })
+    }).collect();
+
+    Ok(Json(json!({ "overdue_items": items })))
+}
+
+// API POST /api/v1/work-items/trigger-sla
+pub async fn trigger_sla_scan(
+    State(pool): State<PgPool>,
+    _tenant: TenantIsolation,
+) -> Result<impl IntoResponse, Response> {
+    let result = monitor_sla_breaches(&pool).await.map_err(|err| {
+        eprintln!("[WorkItem Controller] SLA scan error: {}", err);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": { "code": "SYSTEM_FAULT", "message": "Lỗi máy chủ." } })),
+        )
+            .into_response()
+    })?;
+
+    Ok(Json(result))
 }
