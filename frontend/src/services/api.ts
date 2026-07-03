@@ -121,5 +121,17 @@ export const apiService = {
       throw new Error('Không thể lấy danh sách thành viên Queue');
     }
     return res.json();
+  },
+
+  // 7. GET /api/v1/analytics/kpis (Lấy chỉ số thống kê KPIs)
+  async getKpis(auth: AuthConfig) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/analytics/kpis`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) {
+      throw new Error('Không thể lấy chỉ số KPI');
+    }
+    return res.json();
   }
 };

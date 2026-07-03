@@ -364,4 +364,18 @@ async fn test_all_endpoints() {
     } else {
         panic!("Không nhận được WebSocket broadcast message từ server!");
     }
+
+    // ----------------------------------------------------
+    // TEST Tenant KPI Analytics (Phase 6)
+    // ----------------------------------------------------
+
+    // Test 16: Lấy KPI Analytics
+    let res = client.get(&format!("{}/api/v1/analytics/kpis", base_url))
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .header("x-nextflow-api-key", TEST_API_KEY)
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let kpi_res: Value = res.json().await.unwrap();
+    assert!(kpi_res["metrics"]["total_tasks"].as_u64().unwrap() >= 1);
+    assert!(kpi_res["metrics"]["sla_breach_rate"].as_f64().is_some());
 }

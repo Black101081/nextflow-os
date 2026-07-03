@@ -39,6 +39,7 @@ export default function App() {
   const [queueMembers, setQueueMembers] = useState<any[]>([]);
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
+  const [kpis, setKpis] = useState<any>(null);
 
   // Form states cho tạo Task mới
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -70,8 +71,9 @@ export default function App() {
         const membersData = await apiService.getQueueMembers(auth, selectedQueueId);
         setQueueMembers(membersData.members || []);
 
-        // Mock/Fetch danh sách Work Items thật
-        // Vì API chưa có endpoint list all, ta có thể test trực quan tạo task và hiển thị
+        // Fetch KPI Metrics thật
+        const kpiData = await apiService.getKpis(auth);
+        setKpis(kpiData.metrics);
       } catch (err: any) {
         console.error('Lỗi khi fetch dữ liệu:', err.message);
       }
@@ -125,6 +127,11 @@ export default function App() {
           });
           triggerNotification('success', `Real-time: Nhiệm vụ đã được định tuyến.`);
         }
+
+        // Tự động cập nhật chỉ số KPI real-time tức thời
+        apiService.getKpis(auth)
+          .then(kpiData => setKpis(kpiData.metrics))
+          .catch(() => {});
       } catch (err) {
         console.error('Lỗi phân tích WebSocket message:', err);
       }
@@ -452,19 +459,42 @@ export default function App() {
             </button>
           </div>
 
-          {/* Stats Bar */}
-          <div className="stats-container">
-            <div className="stat-card">
-              <div className="stat-num">{workItems.filter(w => w.status === 'UNASSIGNED').length}</div>
-              <div className="stat-label">Chưa gán</div>
+          {/* Stats & KPIs Bar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="stats-container">
+              <div className="stat-card">
+                <div className="stat-num">{kpis ? kpis.unassigned_count : 0}</div>
+                <div className="stat-label">Chưa gán (Unassigned)</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-num" style={{ color: 'var(--color-primary)' }}>{kpis ? kpis.in_progress_count : 0}</div>
+                <div className="stat-label">Đang xử lý (In Progress)</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-num" style={{ color: 'var(--color-secondary)' }}>{kpis ? kpis.completed_count : 0}</div>
+                <div className="stat-label">Đã xong (Completed)</div>
+              </div>
             </div>
-            <div className="stat-card">
-              <div className="stat-num" style={{ color: 'var(--color-primary)' }}>{workItems.filter(w => w.status === 'IN_PROGRESS').length}</div>
-              <div className="stat-label">Đang làm</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-num" style={{ color: 'var(--color-secondary)' }}>{workItems.filter(w => w.status === 'COMPLETED').length}</div>
-              <div className="stat-label">Đã xong</div>
+
+            <div className="stats-container" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+              <div className="stat-card" style={{ borderLeft: '3px solid var(--color-accent)' }}>
+                <div className="stat-num" style={{ color: 'var(--color-accent)' }}>
+                  {kpis ? `${kpis.sla_breach_rate}%` : '0.0%'}
+                </div>
+                <div className="stat-label">SLA Breach Rate</div>
+              </div>
+              <div className="stat-card" style={{ borderLeft: '3px solid var(--color-info)' }}>
+                <div className="stat-num" style={{ color: 'var(--color-info)' }}>
+                  {kpis ? `${kpis.avg_resolution_seconds}s` : '0s'}
+                </div>
+                <div className="stat-label">Avg Resolution Time</div>
+              </div>
+              <div className="stat-card" style={{ borderLeft: '3px solid var(--color-warning)' }}>
+                <div className="stat-num" style={{ color: 'var(--color-warning)' }}>
+                  {kpis ? kpis.completed_24h : 0}
+                </div>
+                <div className="stat-label">Throughput (24h)</div>
+              </div>
             </div>
           </div>
 

@@ -12,6 +12,7 @@ use crate::controllers::{
     tenant::sync_tenant_users,
     work_item::{create_work_item, get_work_item, update_work_item_status, get_overdue_work_items, trigger_sla_scan},
     websocket::ws_handler,
+    analytics::get_tenant_kpis,
 };
 
 #[derive(Clone)]
@@ -46,6 +47,7 @@ pub fn create_app(pool: sqlx::PgPool) -> axum::Router {
         .route("/api/v1/queues", post(create_queue))
         .route("/api/v1/queues/:id/members", post(add_queue_member).get(get_queue_members))
         .route("/api/v1/tenants/:tenant_id/users/sync", post(sync_tenant_users))
+        .route("/api/v1/analytics/kpis", get(get_tenant_kpis))
         .with_state(state)
         .layer(cors)
 }
