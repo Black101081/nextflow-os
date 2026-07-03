@@ -182,11 +182,11 @@ Nếu cần đọc nhanh toàn hệ, 10 tài liệu nên ưu tiên là:
 
 ## 7. Tài liệu bổ trợ cross-pack
 
-Các tài liệu cross-pack nên tồn tại bên cạnh các pack chính:
 - **002_OS_PRODUCTION_RULES_AND_DEVELOPMENT_LOG**: Quy tắc sản xuất phần mềm bất biến và Nhật ký phát triển thực tế.
-- **003_OS_PRODUCTION_PHASE_1_IMPLEMENTATION_PLAN**: Kế hoạch sản xuất chi tiết cho Lát cắt năng lực 1.
+- **003_OS_PRODUCTION_ROADMAP_FIRST_WEDGE**: Kế hoạch sản xuất chi tiết cho Lát cắt năng lực 1.
 - **004_OS_MASTER_PRODUCTION_ROADMAP**: Lộ trình sản xuất tổng thể gồm 8 giai đoạn từ Core API đến DevOps Go-Live.
-- Global Glossary and Naming Conventions  - SME End-User Operational Playbook (150)
+- **005_OS_FINAL_HANDOVER_AND_DELIVERY**: Báo cáo nghiệm thu & Bàn giao sản phẩm cuối cùng.
+- Global Glossary and Naming Conventions - SME End-User Operational Playbook (150)
 - Master Index and Reading Map  
 - AI Use Case Record Template  
 - Asset Listing and Review Checklist  
