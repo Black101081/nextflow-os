@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: nextflow_postgres_db
+    restart: always
+    environment:
+      POSTGRES_DB: nextflow_core
+      POSTGRES_USER: nf_admin
+      POSTGRES_PASSWORD: nf_secure_password_9981
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+    driver: local
