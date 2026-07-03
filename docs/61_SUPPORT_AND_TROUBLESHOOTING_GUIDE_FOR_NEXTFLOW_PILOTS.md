@@ -1,6 +1,6 @@
 # Nextflow OS – Support and Troubleshooting Guide for Nextflow Pilots
 
-**Document ID:** 61_SUPPORT_AND_TROUBLESHING_GUIDE_FOR_NEXTFLOW_PILOTS  
+**Document ID:** 61_SUPPORT_AND_TROUBLESHOOTING_GUIDE_FOR_NEXTFLOW_PILOTS  
 **Pack:** 03 — Experience & UX  
 **Version:** 1.0  
 **Status:** Draft v1  
