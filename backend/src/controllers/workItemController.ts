@@ -114,7 +114,7 @@ export const updateWorkItemStatus = async (req: Request, res: Response) => {
       [id, tenantId]
     );
 
-    if (taskRes.rowCount === 0) {
+    if ((taskRes.rowCount ?? 0) === 0) {
       return res.status(404).json({
         error: {
           code: 'NOT_FOUND',
@@ -181,7 +181,7 @@ export const getWorkItem = async (req: Request, res: Response) => {
       [id, tenantId]
     );
 
-    if (taskRes.rowCount === 0) {
+    if ((taskRes.rowCount ?? 0) === 0) {
       return res.status(404).json({
         error: {
           code: 'NOT_FOUND',

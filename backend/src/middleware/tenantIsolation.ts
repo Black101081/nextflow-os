@@ -26,7 +26,7 @@ export const tenantIsolationMiddleware = async (req: Request, res: Response, nex
         [tenantIdHeader]
       );
 
-      if (tenantRes.rowCount === 0) {
+      if ((tenantRes.rowCount ?? 0) === 0) {
         return res.status(403).json({
           error: {
             code: 'FORBIDDEN',
@@ -90,7 +90,7 @@ export const tenantIsolationMiddleware = async (req: Request, res: Response, nex
         [token, tenantIdHeader]
       );
 
-      if (userRes.rowCount === 0) {
+      if ((userRes.rowCount ?? 0) === 0) {
         return res.status(401).json({
           error: {
             code: 'UNAUTHORIZED',

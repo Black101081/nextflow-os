@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import workItemRoutes from './routes/workItemRoutes';
+import queueRoutes from './routes/queueRoutes';
+import tenantRoutes from './routes/tenantRoutes';
 
 dotenv.config();
 
@@ -18,6 +20,8 @@ app.get('/health', (req, res) => {
 
 // Cấu hình các routes chính thức
 app.use('/api/v1/work-items', workItemRoutes);
+app.use('/api/v1/queues', queueRoutes);
+app.use('/api/v1/tenants', tenantRoutes);
 
 // Khởi chạy server nếu không chạy qua unit test
 if (process.env.NODE_ENV !== 'test') {

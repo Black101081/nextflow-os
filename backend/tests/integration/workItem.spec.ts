@@ -3,6 +3,8 @@ import app from '../../src/app';
 import { query } from '../../src/config/db';
 import { setupTestDatabase, teardownTestDatabase, TEST_TENANT_ID, TEST_API_KEY, TEST_USER_ID } from '../setup';
 
+jest.setTimeout(30000);
+
 describe('Work Items API Integration Tests (Zero-Mock Policy)', () => {
   beforeAll(async () => {
     // Chuẩn bị DB thật (Docker Postgres) trước khi test

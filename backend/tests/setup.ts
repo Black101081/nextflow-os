@@ -21,7 +21,7 @@ export const setupTestDatabase = async () => {
 
   console.log('[Test Setup] Seeding test User...');
   // Tạo user test
-  const passwordHash = await bcrypt.hash('test_password_123', 12);
+  const passwordHash = await bcrypt.hash('test_password_123', 4);
   await query(
     `INSERT INTO nf_core.users (id, tenant_id, email, password_hash, first_name, last_name, role, is_active) 
      VALUES ($1, $2, 'test.operator@test-corp.com', $3, 'Nguyen', 'Van Test', 'SME_OPS', true)`,
