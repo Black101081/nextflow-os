@@ -10,6 +10,7 @@ COPY . .
 
 # Set NODE_ENV production để Vite build tối ưu
 ENV NODE_ENV=production
+ENV VITE_DOCKER=true
 RUN npm run build
 
 # --- Stage 2: Serve ---

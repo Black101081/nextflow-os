@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 10s      # scrape targets every 10 seconds
+  evaluation_interval: 10s  # evaluate rules every 10 seconds
+
+scrape_configs:
+  # Nextflow Rust Backend metrics
+  - job_name: 'nextflow-backend'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['backend:8000']
+
+  # Nextflow Python AI Service metrics (if metrics endpoint is configured)
+  - job_name: 'nextflow-ai-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['ai-service:8001']
+    # Fallback to avoid error spam if ai-service has no metrics endpoint yet
+    ignore_failures: true

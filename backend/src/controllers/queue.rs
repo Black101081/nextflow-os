@@ -418,3 +418,227 @@ pub async fn route_work_item(
 
     Ok(Json(res))
 }
+
+// GET /api/v1/queues — Lấy danh sách tất cả Queues của Tenant
+pub async fn get_queues(
+    State(state): State<AppState>,
+    tenant: TenantIsolation,
+) -> Result<impl IntoResponse, Response> {
+    let rows = sqlx::query(
+        "SELECT id, name, category, routing_algorithm, sla_target_seconds, created_at FROM nf_core.queues WHERE tenant_id = $1 ORDER BY created_at DESC"
+    )
+    .bind(tenant.tenant_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|err| {
+        eprintln!("[Queue] Fetch queues error: {}", err);
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": { "code": "SYSTEM_FAULT", "message": "Lỗi máy chủ." } }))).into_response()
+    })?;
+
+    let queues: Vec<serde_json::Value> = rows.iter().map(|row| {
+        json!({
+            "id": row.get::<String, _>("id"),
+            "name": row.get::<String, _>("name"),
+            "category": row.get::<String, _>("category"),
+            "routing_algorithm": row.get::<String, _>("routing_algorithm"),
+            "sla_target_seconds": row.get::<i32, _>("sla_target_seconds"),
+            "created_at": row.get::<chrono::DateTime<Utc>, _>("created_at")
+        })
+    }).collect();
+
+    Ok(Json(json!({ "queues": queues })))
+}
+
+// POST /api/v1/queues/:id/claim-next — Claim Task tiếp theo theo thuật toán routing
+pub async fn claim_next_task(
+    State(state): State<AppState>,
+    tenant: TenantIsolation,
+    Path(queue_id): Path<String>,
+) -> Result<impl IntoResponse, Response> {
+    // Lấy queue để biết routing_algorithm
+    let queue_opt = sqlx::query(
+        "SELECT id, routing_algorithm FROM nf_core.queues WHERE id = $1 AND tenant_id = $2"
+    )
+    .bind(&queue_id)
+    .bind(tenant.tenant_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|_| {
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": { "code": "SYSTEM_FAULT", "message": "Lỗi máy chủ." } }))).into_response()
+    })?;
+
+    let queue = queue_opt.ok_or_else(|| {
+        (StatusCode::NOT_FOUND, Json(json!({ "error": { "code": "NOT_FOUND", "message": "Không tìm thấy Queue." } }))).into_response()
+    })?;
+
+    let routing_algo = queue.get::<String, _>("routing_algorithm");
+
+    // Lấy user_id từ Bearer token (bắt buộc cho claim)
+    let user_id = tenant.user_id.ok_or_else(|| {
+        (StatusCode::UNAUTHORIZED, Json(json!({ "error": { "code": "UNAUTHORIZED", "message": "Cần Bearer token chứa User ID để claim task." } }))).into_response()
+    })?;
+
+    // Tìm task theo thuật toán routing
+    let task_opt = match routing_algo.as_str() {
+        "ROUND_ROBIN" => {
+            // ROUND_ROBIN: Gán cho người này nếu họ có ít task IN_PROGRESS nhất trong queue
+            // Lấy task UNASSIGNED cũ nhất chưa gán cho user này lần cuối
+            let q = r#"
+                SELECT id, title, priority, created_at
+                FROM nf_core.work_items
+                WHERE queue_id = $1 AND tenant_id = $2 AND status = 'UNASSIGNED'
+                ORDER BY created_at ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            "#;
+            sqlx::query(q).bind(&queue_id).bind(tenant.tenant_id).fetch_optional(&state.pool).await.ok().flatten()
+        },
+        "CAPACITY_BASED" => {
+            // CAPACITY_BASED: Chỉ claim nếu user đang có < 5 tasks IN_PROGRESS
+            let count_q = "SELECT COUNT(*) as cnt FROM nf_core.work_items WHERE assignee_id = $1 AND status = 'IN_PROGRESS' AND tenant_id = $2";
+            let count_row = sqlx::query(count_q).bind(user_id).bind(tenant.tenant_id).fetch_one(&state.pool).await;
+            let current_load: i64 = count_row.map(|r| r.get::<i64, _>("cnt")).unwrap_or(0);
+            if current_load >= 5 {
+                return Err((
+                    StatusCode::CONFLICT,
+                    Json(json!({ "error": { "code": "CAPACITY_FULL", "message": "Bạn đang xử lý đủ 5 tasks. Vui lòng hoàn thành trước khi nhận thêm." } }))
+                ).into_response());
+            }
+            let q = r#"
+                SELECT id, title, priority, created_at
+                FROM nf_core.work_items
+                WHERE queue_id = $1 AND tenant_id = $2 AND status = 'UNASSIGNED'
+                ORDER BY CASE priority WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END, created_at ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            "#;
+            sqlx::query(q).bind(&queue_id).bind(tenant.tenant_id).fetch_optional(&state.pool).await.ok().flatten()
+        },
+        _ => {
+            // FIFO (default): Task cũ nhất, ưu tiên CRITICAL > HIGH > MEDIUM > LOW
+            let q = r#"
+                SELECT id, title, priority, created_at
+                FROM nf_core.work_items
+                WHERE queue_id = $1 AND tenant_id = $2 AND status = 'UNASSIGNED'
+                ORDER BY CASE priority WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END, created_at ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            "#;
+            sqlx::query(q).bind(&queue_id).bind(tenant.tenant_id).fetch_optional(&state.pool).await.ok().flatten()
+        }
+    };
+
+    let task_row = match task_opt {
+        Some(r) => r,
+        None => {
+            return Ok(Json(json!({
+                "claimed": false,
+                "message": "Không có task nào đang chờ trong hàng đợi này."
+            })).into_response());
+        }
+    };
+
+    let task_id: Uuid = task_row.get("id");
+
+    // Gán task cho user: status IN_PROGRESS, assignee_id = user, started_at = NOW()
+    let update_row = sqlx::query(r#"
+        UPDATE nf_core.work_items
+        SET status = 'IN_PROGRESS', assignee_id = $1, started_at = CURRENT_TIMESTAMP, version = version + 1
+        WHERE id = $2 AND tenant_id = $3 AND status = 'UNASSIGNED'
+        RETURNING id, title, priority, status, version
+    "#)
+    .bind(user_id)
+    .bind(task_id)
+    .bind(tenant.tenant_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|err| {
+        eprintln!("[ClaimNext] DB update error: {}", err);
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": { "code": "SYSTEM_FAULT", "message": "Lỗi khi claim task." } }))).into_response()
+    })?;
+
+    let claimed_row = match update_row {
+        Some(r) => r,
+        None => {
+            // Race condition: task đã bị người khác claim
+            return Ok(Json(json!({
+                "claimed": false,
+                "message": "Task vừa được người khác nhận trước. Vui lòng thử lại."
+            })).into_response());
+        }
+    };
+
+    // Real-time WebSocket Broadcast
+    let _ = state.tx.send(json!({
+        "event": "WORK_ITEM_CLAIMED",
+        "data": {
+            "work_item_id": claimed_row.get::<Uuid, _>("id"),
+            "assigned_to": user_id,
+            "routing_algorithm": routing_algo
+        }
+    }).to_string());
+
+    Ok(Json(json!({
+        "claimed": true,
+        "work_item": {
+            "id": claimed_row.get::<Uuid, _>("id"),
+            "title": claimed_row.get::<String, _>("title"),
+            "priority": claimed_row.get::<String, _>("priority"),
+            "status": claimed_row.get::<String, _>("status"),
+            "version": claimed_row.get::<i32, _>("version"),
+            "assigned_to": user_id
+        },
+        "routing_algorithm": routing_algo
+    })).into_response())
+}
+
+pub async fn remove_queue_member(
+    State(state): State<AppState>,
+    tenant: TenantIsolation,
+    Path((id, user_id)): Path<(String, Uuid)>,
+) -> Result<impl IntoResponse, Response> {
+    // 1. Kiểm tra Queue tồn tại và thuộc Tenant
+    let queue_opt = sqlx::query("SELECT id FROM nf_core.queues WHERE id = $1 AND tenant_id = $2")
+        .bind(&id)
+        .bind(tenant.tenant_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": { "code": "SYSTEM_FAULT", "message": "Lỗi máy chủ." } })),
+            )
+                .into_response()
+        })?;
+
+    if queue_opt.is_none() {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": { "code": "NOT_FOUND", "message": "Không tìm thấy Queue." } })),
+        )
+            .into_response());
+    }
+
+    // 2. Thực hiện xoá khỏi bảng queue_members
+    sqlx::query("DELETE FROM nf_core.queue_members WHERE queue_id = $1 AND user_id = $2")
+        .bind(&id)
+        .bind(user_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": { "code": "SYSTEM_FAULT", "message": "Lỗi máy chủ." } })),
+            )
+                .into_response()
+        })?;
+
+    let res = json!({
+        "queue_id": id,
+        "user_id": user_id,
+        "status": "REMOVED"
+    });
+
+    Ok(Json(res))
+}
+

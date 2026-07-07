@@ -4,6 +4,7 @@ export interface AuthConfig {
   tenantId: string;
   apiKey: string;
 }
+import { offlineService } from './offlineSync';
 
 export interface WorkItemPayload {
   title: string;
@@ -13,6 +14,7 @@ export interface WorkItemPayload {
   category?: string;
   source?: string;
   external_id?: string;
+  metadata?: any;
 }
 
 export const getHeaders = (auth: AuthConfig) => {
@@ -48,6 +50,28 @@ export const apiService = {
     return res.json();
   },
 
+  // GET /api/v1/work-items (Lấy danh sách Tasks)
+  async getWorkItems(auth: AuthConfig) {
+    if (!offlineService.isOnline()) {
+      return await offlineService.getWorkItemsFromCache();
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/work-items`, {
+        method: 'GET',
+        headers: getHeaders(auth),
+      });
+      if (!res.ok) throw new Error('Không thể tải danh sách Work Items');
+      const data = await res.json();
+      
+      // Cập nhật Cache local sau khi gọi API thành công
+      await offlineService.saveWorkItemsToCache(data);
+      return data;
+    } catch (error) {
+      // Fallback khi server down
+      return await offlineService.getWorkItemsFromCache();
+    }
+  },
+
   // 2. GET /api/v1/work-items/{id} (Chi tiết Task)
   async getWorkItem(auth: AuthConfig, id: string) {
     const res = await fetch(`${API_BASE_URL}/api/v1/work-items/${id}`, {
@@ -62,22 +86,42 @@ export const apiService = {
 
   // 3. PATCH /api/v1/work-items/{id}/status (Cập nhật trạng thái)
   async updateWorkItemStatus(auth: AuthConfig, id: string, status: string) {
-    // Nếu status là IN_PROGRESS, ta dùng Authorization Header thay API Key để test tự động gán assignee
+    if (!offlineService.isOnline()) {
+      await offlineService.enqueueSyncTask({
+        id: crypto.randomUUID(),
+        type: 'UPDATE_STATUS',
+        payload: { id, status },
+        timestamp: Date.now()
+      });
+      await offlineService.updateWorkItemStatusInCache(id, status);
+      return { success: true, _offline: true };
+    }
+
     const headers: any = getHeaders(auth);
     if (status === 'IN_PROGRESS') {
-      // Phục vụ test case: gán Bearer Token bằng ID của User Nguyen Van Test
       headers['Authorization'] = 'Bearer 8f3b2a1a-4c54-4b01-90e6-d701748f0851';
     }
 
-    const res = await fetch(`${API_BASE_URL}/api/v1/work-items/${id}/status`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify({ status }),
-    });
-    if (!res.ok) {
-      throw new Error('Không thể cập nhật trạng thái');
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/work-items/${id}/status`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error('Không thể cập nhật trạng thái');
+      const data = await res.json();
+      await offlineService.updateWorkItemStatusInCache(id, status);
+      return data;
+    } catch (error) {
+      await offlineService.enqueueSyncTask({
+        id: crypto.randomUUID(),
+        type: 'UPDATE_STATUS',
+        payload: { id, status },
+        timestamp: Date.now()
+      });
+      await offlineService.updateWorkItemStatusInCache(id, status);
+      return { success: true, _offline: true };
     }
-    return res.json();
   },
 
   // 4. POST /api/v1/work-items/{id}/route (Định tuyến thủ công)
@@ -133,5 +177,377 @@ export const apiService = {
       throw new Error('Không thể lấy chỉ số KPI');
     }
     return res.json();
-  }
+  },
+
+  // 8. GET /api/v1/queues (Lấy danh sách Queues từ DB)
+  async getQueues(auth: AuthConfig) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/queues`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) {
+      try {
+        const err = await res.json();
+        throw new Error(err.error?.message || 'Không thể lấy danh sách Queue');
+      } catch {
+        throw new Error('Không thể lấy danh sách Queue (Mã trạng thái: ' + res.status + ')');
+      }
+    }
+    return res.json(); // { queues: [...] }
+  },
+
+  // 9. POST /api/v1/queues/:id/claim-next (Claim task tiếp theo)
+  async claimNextTask(auth: AuthConfig, queueId: string, userId?: string) {
+    const headers: any = getHeaders(auth);
+    if (userId) {
+      headers['Authorization'] = `Bearer ${userId}`;
+    }
+    const res = await fetch(`${API_BASE_URL}/api/v1/queues/${queueId}/claim-next`, {
+      method: 'POST',
+      headers,
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Không thể claim task');
+    }
+    return res.json();
+  },
+
+  // 10. POST /api/v1/work-items/:id/escalate (Leo thang task)
+  async escalateTask(auth: AuthConfig, id: string, reason: string, exceptionType?: string) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/work-items/${id}/escalate`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ reason, exception_type: exceptionType || 'MANUAL_ESCALATION' }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Không thể leo thang task');
+    }
+    return res.json();
+  },
+
+  // 10b. GET /api/v1/work-items/exceptions
+  async getExceptions(auth: AuthConfig) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/work-items/exceptions`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) throw new Error('Không thể tải danh sách Exceptions');
+    return res.json();
+  },
+
+  // 10c. POST /api/v1/work-items/exceptions/:id/resolve
+  async resolveException(auth: AuthConfig, id: string, decision: 'APPROVED' | 'REJECTED') {
+    const res = await fetch(`${API_BASE_URL}/api/v1/work-items/exceptions/${id}/resolve`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ decision }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Không thể xử lý exception');
+    }
+    return res.json();
+  },
+
+
+  // 11. GET /api/v1/connectors/configs (Lấy danh sách connectors)
+  async getConnectors(auth: AuthConfig) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/connectors/configs`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) throw new Error('Không thể lấy connectors');
+    return res.json();
+  },
+
+  // 12. POST /api/v1/connectors/configs (Tạo connector mới)
+  async createConnector(auth: AuthConfig, connectorName: string, credentials: string) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/connectors/configs`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ connector_name: connectorName, credentials }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Không thể tạo connector');
+    }
+    return res.json();
+  },
+
+  // =====================================================================
+  // Phase 6: AI Intelligence Layer
+  // =====================================================================
+
+  // 13. GET /api/v1/ai/health — kiểm tra trạng thái Python AI service
+  async checkAiHealth(auth: AuthConfig): Promise<{ ai_service: string; detail?: unknown }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/ai/health`, {
+        headers: getHeaders(auth),
+      });
+      if (!res.ok) return { ai_service: 'DOWN' };
+      return res.json();
+    } catch {
+      return { ai_service: 'DOWN' };
+    }
+  },
+
+  // 14. POST /api/v1/ai/sla-risk — tính điểm rủi ro SLA cho một work item
+  async getSlaRisk(auth: AuthConfig, payload: {
+    work_item_id: string;
+    age_minutes: number;
+    time_to_sla_minutes: number;
+    priority: string;
+    category?: string;
+    queue_load?: number;
+    historical_breach_rate?: number;
+    assignee_load?: number;
+    recent_reopen_count?: number;
+  }) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/sla-risk`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('AI SLA risk service không khả dụng');
+    return res.json();
+  },
+
+  // 15. POST /api/v1/ai/routing-recommend — đề xuất top-3 operators
+  async getRoutingRecommendation(auth: AuthConfig, payload: {
+    queue_id: string;
+    task_category: string;
+    task_priority: string;
+    operators?: unknown[];
+  }) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/routing-recommend`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ ...payload, operators: payload.operators ?? [] }),
+    });
+    if (!res.ok) throw new Error('AI Routing service không khả dụng');
+    return res.json();
+  },
+
+  // 16. POST /api/v1/ai/rag-query — hỏi RAG SOP Assistant
+  async queryRagAssistant(auth: AuthConfig, question: string, topK = 5) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/rag-query`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ question, top_k: topK }),
+    });
+    if (!res.ok) throw new Error('RAG Assistant không khả dụng');
+    return res.json();
+  },
+
+  // 17. POST /api/v1/tenants/initialize-template (Cấu hình mẫu Tenant)
+  async initializeTenantTemplate(auth: AuthConfig, templateId: string, wipeExisting: boolean) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/tenants/initialize-template`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ template_id: templateId, wipe_existing: wipeExisting }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Không thể khởi tạo gói mẫu');
+    }
+    return res.json();
+  },
+
+  // 18. GET /api/v1/tenants/policies (Lấy chính sách)
+  async getTenantPolicies(auth: AuthConfig) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/tenants/policies`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) throw new Error('Không thể tải chính sách vận hành');
+    return res.json();
+  },
+
+  // 19. POST /api/v1/tenants/policies (Cập nhật chính sách)
+  async updateTenantPolicies(auth: AuthConfig, policies: { sla_minutes_default: number; sla_minutes_high: number; auto_assignment_enabled: boolean; routing_mode: string }) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/tenants/policies`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(policies),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Không thể cập nhật chính sách');
+    }
+    return res.json();
+  },
+
+  // 20. GET /api/v1/platform/tenants (List all tenants)
+  async getPlatformTenants(adminKey: string) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/platform/tenants`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-platform-admin-key': adminKey,
+      },
+    });
+    if (!res.ok) throw new Error('Không thể tải danh sách Tenant của hệ thống.');
+    return res.json();
+  },
+
+  // 21. POST /api/v1/platform/tenants (Create new tenant)
+  async createPlatformTenant(adminKey: string, payload: { company_name: string; domain: string; subscription_tier?: string; admin_email: string; admin_first_name: string; admin_last_name: string }) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/platform/tenants`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-platform-admin-key': adminKey,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Không thể tạo mới Tenant.');
+    }
+    return res.json();
+  },
+
+  // 22. PATCH /api/v1/platform/tenants/:id (Update tenant)
+  async updatePlatformTenant(adminKey: string, id: string, payload: { status?: string; subscription_tier?: string }) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/platform/tenants/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-platform-admin-key': adminKey,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Không thể cập nhật Tenant.');
+    }
+    return res.json();
+  },
+
+  // 23. GET /api/v1/tenants/templates (List all vertical template packs)
+  async getTemplatePacks(): Promise<TemplatePack[]> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/tenants/templates`);
+    if (!res.ok) {
+      throw new Error('Không thể tải danh sách Gói Giải pháp Mẫu.');
+    }
+    return res.json();
+  },
+
+  // 24. GET /api/v1/tenants/users (List all users in tenant)
+  async getTenantUsers(auth: AuthConfig) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/tenants/users`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) throw new Error('Không thể tải danh sách nhân sự');
+    return res.json();
+  },
+
+  // 25. POST /api/v1/tenants/users (Create user in tenant)
+  async createTenantUser(auth: AuthConfig, payload: { email: string; first_name: string; last_name: string; role: string }) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/tenants/users`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Không thể tạo nhân sự mới');
+    }
+    return res.json();
+  },
+
+  // 26. PATCH /api/v1/tenants/users/:id (Update user in tenant)
+  async updateTenantUser(auth: AuthConfig, userId: string, payload: { first_name?: string; last_name?: string; role?: string; is_active?: boolean }) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/tenants/users/${userId}`, {
+      method: 'PATCH',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Không thể cập nhật nhân sự');
+    }
+    return res.json();
+  },
+
+  // 27. DELETE /api/v1/tenants/users/:id (Delete user from tenant)
+  async deleteTenantUser(auth: AuthConfig, userId: string) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/tenants/users/${userId}`, {
+      method: 'DELETE',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) throw new Error('Không thể xoá nhân sự');
+    return res.json();
+  },
+
+  // 28. POST /api/v1/queues/:id/members (Add member to queue)
+  async addQueueMember(auth: AuthConfig, queueId: string, userId: string) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/queues/${queueId}/members`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ user_id: userId }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Không thể thêm nhân sự vào Queue');
+    }
+    return res.json();
+  },
+
+  // 29. DELETE /api/v1/queues/:id/members/:user_id (Remove member from queue)
+  async removeQueueMember(auth: AuthConfig, queueId: string, userId: string) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/queues/${queueId}/members/${userId}`, {
+      method: 'DELETE',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) throw new Error('Không thể xoá nhân sự khỏi Queue');
+    return res.json();
+  },
+  // =====================================================================
+  // Phase 7: Billing & Payments
+  // =====================================================================
+
+  // 30. GET /api/v1/billing/invoices (Lấy danh sách hóa đơn)
+  async getInvoices(auth: AuthConfig) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/billing/invoices`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) throw new Error('Không thể tải danh sách hóa đơn');
+    return res.json();
+  },
+
+  // 31. POST /api/v1/billing/invoices (Tạo hóa đơn & Payment link)
+  async createInvoice(auth: AuthConfig, payload: { work_item_id: string; amount: number; due_date?: string }) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/billing/invoices`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Không thể tạo hóa đơn');
+    }
+    return res.json();
+  },
 };
+
+export interface TemplatePack {
+  id: string;
+  name: string;
+  description: string;
+  industry: string;
+  config_metadata: {
+    queues: Array<{
+      id: string;
+      name: string;
+      category: string;
+      routing: string;
+      sla_seconds: number;
+    }>;
+  };
+}
+

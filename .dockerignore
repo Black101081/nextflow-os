@@ -1,0 +1,9 @@
+# Loại trừ các file build tạm và node_modules để tối ưu hóa Docker Build Context
+.target/
+target/
+**/node_modules/
+e2e/node_modules/
+.git/
+.cargo/
+*.log
+deploy_dist/

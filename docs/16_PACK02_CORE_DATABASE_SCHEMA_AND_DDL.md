@@ -5,8 +5,17 @@
 **Version:** 1.0  
 **Status:** Draft v1  
 **Primary Owner:** Platform Architecture / Lead Database Engineer  
-**Dependent Packs:** 02 Core Platform & Data, 04 Orchestration & Work Management, 05 Integration & Extensibility, 06 Operations & Governance, 07 Data, Analytics & Insights  
+**Dependent Packs:** 02 Core Platform & Data, 04 Orchestration & Work Management, 05 Integration & Extensibility, 06 Operations & Governance, 07 Data, Analytics & Insights, 10 No-code Dynamic Architecture  
 **Prerequisite Documents:** 10_PRODUCT_OVERVIEW, 11_CAPABILITY_MAP, 12_ENGINE_BOUNDARY_SPECIFICATION, 13_FIRST_WEDGE_CAPABILITY_SLICE
+
+---
+
+> [!WARNING]
+> **V2 ARCHITECTURE UPDATE:**
+> Mô hình Relational với bảng `nf_core.work_items` và các bảng tĩnh (Hardcoded Schema) đã chính thức bị **DEPRECATED (Hủy bỏ)** trong hệ sinh thái của Nextflow OS để phục vụ cho tầm nhìn No-code.
+> Hiện tại, toàn bộ dữ liệu nghiệp vụ của SME được lưu trữ thông qua cơ chế **Dynamic Entities (Thực thể động) & JSONB** tại schema `nf_meta`.
+> 
+> 👉 **Vui lòng đọc tài liệu mới nhất tại:** `160_PACK10_NOCODE_DYNAMIC_ARCHITECTURE.md` để hiểu cách lưu trữ và thao tác dữ liệu kiểu mới!
 
 ---
 

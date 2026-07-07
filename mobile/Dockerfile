@@ -10,6 +10,7 @@ COPY . .
 
 # Set NODE_ENV production
 ENV NODE_ENV=production
+ENV VITE_DOCKER=true
 RUN npm run build
 
 # --- Stage 2: Serve ---

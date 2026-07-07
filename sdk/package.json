@@ -1,0 +1,16 @@
+{
+  "name": "@nextflow-os/extension-sdk",
+  "version": "1.0.0",
+  "description": "Nextflow OS Extension SDK — postMessage handshake, BroadcastChannel, permission API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": ["nextflow", "extension", "sdk", "iframe", "sandbox"],
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
