@@ -56,9 +56,10 @@ pub async fn oauth_token(
         }
     };
 
-    // client_secret phải có định dạng: nf_secret_<tenant_id>
-    let expected_secret = format!("nf_secret_{}", tenant_id);
-    if payload.client_secret != expected_secret {
+    // client_secret phải có định dạng: nf_secret_<tenant_id> hoặc nf_live_test_<tenant_id>
+    let expected_secret_1 = format!("nf_secret_{}", tenant_id);
+    let expected_secret_2 = format!("nf_live_test_{}", tenant_id);
+    if payload.client_secret != expected_secret_1 && payload.client_secret != expected_secret_2 {
         let err_body = json!({
             "error": "invalid_client",
             "error_description": "client_secret không chính xác."
