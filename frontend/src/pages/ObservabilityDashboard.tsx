@@ -1,26 +1,25 @@
 import { useState, useEffect } from 'react';
 import { Activity, Database, PlayCircle, ShieldCheck, Cpu } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ObservabilityDashboard() {
+  const { token } = useAuth();
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchReports();
-  }, []);
+    if (token) {
+      fetchReports();
+    }
+  }, [token]);
 
   const fetchReports = async () => {
     try {
-      const authStr = localStorage.getItem('nf_auth');
-      if (!authStr) return;
-      const auth = JSON.parse(authStr);
+      if (!token) return;
       
-      // Mặc định gọi API lấy dữ liệu. 
-      // Do apiService chưa có type cho báo cáo này, ta dùng fetch nội bộ hoặc gọi qua route
-      const res = await fetch(`http://localhost:8000/api/v1/analytics/daily-reports`, {
+      const res = await fetch(`/api/v1/analytics/daily-reports`, {
         headers: {
-          'x-nextflow-tenant-id': auth.tenantId,
-          'x-nextflow-api-key': auth.apiKey
+          'Authorization': `Bearer ${token}`
         }
       });
       const data = await res.json();
@@ -34,16 +33,13 @@ export default function ObservabilityDashboard() {
 
   const handleGenerateReport = async () => {
     try {
+      if (!token) return;
       setLoading(true);
-      const authStr = localStorage.getItem('nf_auth');
-      if (!authStr) return;
-      const auth = JSON.parse(authStr);
       
-      const res = await fetch(`http://localhost:8000/api/v1/analytics/generate-daily-report`, {
+      const res = await fetch(`/api/v1/analytics/generate-daily-report`, {
         method: 'POST',
         headers: {
-          'x-nextflow-tenant-id': auth.tenantId,
-          'x-nextflow-api-key': auth.apiKey
+          'Authorization': `Bearer ${token}`
         }
       });
       const data = await res.json();
