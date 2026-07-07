@@ -72,15 +72,15 @@ impl FromRequestParts<AppState> for RbacContext {
         };
 
         // 2. Truy vấn Database lấy Role của User
-        let user_record = sqlx::query!(
+        let user_record = sqlx::query(
             r#"
             SELECT role 
             FROM nf_core.users 
             WHERE id = $1 AND tenant_id = $2 AND is_active = true
             "#,
-            user_id,
-            isolation.tenant_id
         )
+        .bind(user_id)
+        .bind(isolation.tenant_id)
         .fetch_optional(&state.pool)
         .await
         .map_err(|err| {
@@ -89,8 +89,10 @@ impl FromRequestParts<AppState> for RbacContext {
             (axum::http::StatusCode::INTERNAL_SERVER_ERROR, err_body).into_response()
         })?;
 
-        let user = match user_record {
-            Some(u) => u,
+        let user_role: String = match user_record {
+            Some(row) => {
+                row.get("role")
+            }
             None => {
                 let err = Json(json!({"error": "Tài khoản không tồn tại, sai tenant_id hoặc đã bị khóa."}));
                 return Err((axum::http::StatusCode::UNAUTHORIZED, err).into_response());
@@ -105,7 +107,7 @@ impl FromRequestParts<AppState> for RbacContext {
             WHERE role_id = $1
             "#
         )
-        .bind(&user.role)
+        .bind(&user_role)
         .fetch_all(&state.pool)
         .await
         .map_err(|err| {
@@ -114,13 +116,15 @@ impl FromRequestParts<AppState> for RbacContext {
             (axum::http::StatusCode::INTERNAL_SERVER_ERROR, err_body).into_response()
         })?;
 
-        let permissions: Vec<String> = permissions_records.into_iter().map(|r| r.get("permission_id")).collect();
+        let permissions: Vec<String> = permissions_records.into_iter().map(|r| {
+            r.get("permission_id")
+        }).collect();
 
         // 4. Trả về Context
         Ok(RbacContext {
             tenant_id: isolation.tenant_id,
             user_id,
-            role_id: user.role,
+            role_id: user_role,
             permissions,
         })
     }
