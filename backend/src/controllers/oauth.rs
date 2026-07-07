@@ -2,12 +2,14 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
+    extract::State,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use chrono::{Utc, Duration};
 use jsonwebtoken::{encode, Header, EncodingKey};
 use uuid::Uuid;
+use crate::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct TokenRequest {
@@ -27,11 +29,13 @@ pub struct TokenResponse {
 pub struct Claims {
     pub sub: String,         // client_id
     pub tenant_id: Uuid,     // tenant_id
-    pub role: String,        // role (ví dụ: "INTEGRATION_CLIENT")
+    pub role: String,        // role
     pub exp: i64,            // Expiration time
+    pub user_id: Option<Uuid>,
 }
 
 pub async fn oauth_token(
+    State(state): State<AppState>,
     Json(payload): Json<TokenRequest>,
 ) -> Result<impl IntoResponse, Response> {
     // 1. Kiểm tra grant_type
@@ -67,7 +71,33 @@ pub async fn oauth_token(
         return Err((StatusCode::UNAUTHORIZED, Json(err_body)).into_response());
     }
 
-    // 3. Tạo JWT Token
+    // 3. Tìm tài khoản người dùng đại diện của Tenant trong Database (ưu tiên SME_LEADER)
+    let user_row = sqlx::query(
+        r#"
+        SELECT id, role 
+        FROM nf_core.users 
+        WHERE tenant_id = $1 AND is_active = true
+        ORDER BY CASE WHEN role = 'SME_LEADER' THEN 1 ELSE 2 END ASC, created_at ASC
+        LIMIT 1
+        "#
+    )
+    .bind(tenant_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| {
+        eprintln!("[OAuth Controller] DB Error fetching user: {}", e);
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "server_error", "error_description": "Lỗi kết nối cơ sở dữ liệu." }))).into_response()
+    })?;
+
+    let (user_id, role) = match user_row {
+        Some(row) => {
+            use sqlx::Row;
+            (Some(row.get::<Uuid, _>("id")), row.get::<String, _>("role"))
+        }
+        None => (None, "INTEGRATION_CLIENT".to_string()),
+    };
+
+    // 4. Tạo JWT Token
     let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "nf_gateway_secret_key_123!".to_string());
     let exp_duration = Duration::hours(1);
     let expiration = Utc::now() + exp_duration;
@@ -75,8 +105,9 @@ pub async fn oauth_token(
     let claims = Claims {
         sub: payload.client_id,
         tenant_id,
-        role: "INTEGRATION_CLIENT".to_string(),
+        role,
         exp: expiration.timestamp(),
+        user_id,
     };
 
     let token = match encode(

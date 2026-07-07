@@ -160,7 +160,6 @@ where
                     user_id = Some(u_id);
                     authenticated = true;
                 } else {
-                    // Xác thực JWT token do API Gateway cấp phát
                     let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "nf_gateway_secret_key_123!".to_string());
                     let validation = jsonwebtoken::Validation::default();
                     if let Ok(token_data) = jsonwebtoken::decode::<crate::controllers::oauth::Claims>(
@@ -171,6 +170,7 @@ where
                         // So khớp Tenant ID
                         if token_data.claims.tenant_id == tenant_id {
                             authenticated = true;
+                            user_id = token_data.claims.user_id;
                         }
                     }
                 }
