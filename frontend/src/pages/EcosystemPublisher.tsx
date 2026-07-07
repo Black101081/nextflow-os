@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { apiService, AuthConfig } from '../services/api';
+import { apiService, type AuthConfig } from '../services/api';
 import type { NextflowManifest } from '../types/sdk';
 
 // ---------------------------------------------------------------------------
@@ -22,19 +22,21 @@ interface ExtensionDB {
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-const MarketplaceAdmin: React.FC = () => {
+import { useAuth } from '../contexts/AuthContext';
+
+const EcosystemPublisher: React.FC = () => {
+  const { user } = useAuth();
+  const adminKey = user?.tenant_id || '';
   const [listings, setListings] = useState<ExtensionDB[]>([]);
-  const [recommendations, setRecommendations] = useState<ExtensionDB[]>([]);
-  const [recommendationInsight, setRecommendationInsight] = useState('');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'listings' | 'recommendations' | 'submit'>('listings');
+  const [activeTab, setActiveTab] = useState<'listings' | 'submit'>('submit');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Giả lập config Auth của user hiện tại
+  // Dùng adminKey để gọi API (tương tự như auth, nhưng đây là Tầng 1)
   const auth: AuthConfig = {
-    tenantId: '00000000-0000-0000-0000-000000000001',
-    apiKey: 'pk_live_123',
+    tenantId: 'platform-admin',
+    apiKey: adminKey
   };
 
   useEffect(() => {
@@ -48,13 +50,8 @@ const MarketplaceAdmin: React.FC = () => {
       if (extRes.status === 'success') {
         setListings(extRes.data);
       }
-      const recRes = await apiService.getMarketplaceRecommendations(auth);
-      if (recRes.status === 'success') {
-        setRecommendations(recRes.data);
-        setRecommendationInsight(recRes.recommendation_insight);
-      }
     } catch (err) {
-      console.error('Error fetching marketplace data', err);
+      console.error('Error fetching ecosystem data', err);
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +70,6 @@ const MarketplaceAdmin: React.FC = () => {
         try {
           const manifest = JSON.parse(ev.target?.result as string) as NextflowManifest;
           
-          // Giả lập code content gửi lên để AI quét
           const mockCodeContent = "console.log('Safe code snippet');" + (manifest.name.includes("Hack") ? " eval(data);" : "");
 
           const payload = {
@@ -100,7 +96,7 @@ const MarketplaceAdmin: React.FC = () => {
       };
       reader.readAsText(file);
     },
-    []
+    [] // eslint-disable-next-line react-hooks/exhaustive-deps
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -123,7 +119,7 @@ const MarketplaceAdmin: React.FC = () => {
       }}
     >
       <div style={{ position: 'relative' }}>
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{listing.name}</h3>
+        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#000' }}>{listing.name}</h3>
         <code style={{ fontSize: 12, color: '#6b7280' }}>v{listing.version} by {listing.vendor}</code>
         <p style={{ margin: '4px 0', color: '#374151', fontSize: 13 }}>{listing.description}</p>
         
@@ -174,34 +170,48 @@ const MarketplaceAdmin: React.FC = () => {
             padding: '6px 16px',
             borderRadius: 6,
             border: 'none',
-            background: '#6366f1',
+            background: '#ef4444',
             color: '#fff',
             cursor: 'pointer',
             fontWeight: 600,
             fontSize: 13,
           }}
         >
-          Cài đặt
+          Từ chối (Reject)
+        </button>
+        <button
+          style={{
+            padding: '6px 16px',
+            borderRadius: 6,
+            border: 'none',
+            background: '#10b981',
+            color: '#fff',
+            cursor: 'pointer',
+            fontWeight: 600,
+            fontSize: 13,
+          }}
+        >
+          Duyệt & Phát hành
         </button>
       </div>
     </div>
   );
 
   return (
-    <div style={{ padding: '24px', fontFamily: 'Inter, sans-serif', maxWidth: 960, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>
-        🛒 Nextflow Marketplace (Web3 & AI Powered)
+    <div style={{ padding: '24px', fontFamily: 'Inter, sans-serif', maxWidth: 960, margin: '0 auto', background: '#fff', borderRadius: '12px' }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4, color: '#000' }}>
+        🛒 Nextflow Ecosystem Publisher
       </h1>
       <p style={{ color: '#6b7280', marginBottom: 24 }}>
-        Hệ sinh thái mở rộng với Smart Contracts phân chia doanh thu và AI kiểm duyệt.
+        Dành cho Platform Admin & Developers. Phát hành, kiểm duyệt ứng dụng và quản lý hệ sinh thái.
       </p>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        {(['listings', 'recommendations', 'submit'] as const).map((tab) => (
+        {(['submit', 'listings'] as const).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => setActiveTab(tab as any)}
             style={{
               padding: '8px 20px',
               borderRadius: 8,
@@ -212,46 +222,20 @@ const MarketplaceAdmin: React.FC = () => {
               color: activeTab === tab ? '#fff' : '#374151',
             }}
           >
-            {tab === 'listings' && '📋 Tất cả Extensions'}
-            {tab === 'recommendations' && '✨ Gợi ý từ AI'}
-            {tab === 'submit' && '📤 Submit Manifest (Devs)'}
+            {tab === 'submit' && '📤 Submit App Mới'}
+            {tab === 'listings' && '📋 Quản lý Apps chờ duyệt'}
           </button>
         ))}
       </div>
 
-      {isLoading && <p>Đang tải dữ liệu từ Blockchain & Hệ thống...</p>}
-
-      {/* ─── Tab: Listings ─────────────────────────────────────────────────── */}
-      {activeTab === 'listings' && !isLoading && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {listings.map(renderCard)}
-          {listings.length === 0 && <p>Chưa có Extension nào.</p>}
-        </div>
-      )}
-
-      {/* ─── Tab: Recommendations ───────────────────────────────────────────── */}
-      {activeTab === 'recommendations' && !isLoading && (
-        <div>
-          <div style={{ background: '#fef3c7', color: '#92400e', padding: '16px', borderRadius: 8, marginBottom: 24, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            <span style={{ fontSize: 20 }}>🤖</span>
-            <div>
-              <strong style={{ display: 'block', marginBottom: 4 }}>AI Insight (Dựa trên dữ liệu vận hành):</strong>
-              {recommendationInsight}
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {recommendations.map(renderCard)}
-            {recommendations.length === 0 && <p>Hiện không có gợi ý nào phù hợp.</p>}
-          </div>
-        </div>
-      )}
+      {isLoading && <p style={{ color: '#000' }}>Đang tải dữ liệu từ Blockchain & Hệ thống...</p>}
 
       {/* ─── Tab: Submit ───────────────────────────────────────────────────── */}
       {activeTab === 'submit' && (
-        <div style={{ background: '#fff', padding: 24, borderRadius: 12, border: '1px solid #e5e7eb' }}>
-          <h2 style={{ fontSize: 18, marginTop: 0 }}>Đăng ký Extension Mới (Vendor)</h2>
+        <div style={{ background: '#f9fafb', padding: 24, borderRadius: 12, border: '1px solid #e5e7eb' }}>
+          <h2 style={{ fontSize: 18, marginTop: 0, color: '#000' }}>Đăng ký Extension Mới (Vendor)</h2>
           <p style={{ color: '#6b7280', fontSize: 14 }}>
-            Tải lên file <code>manifest.json</code> của bạn. AI Security Auditor sẽ quét mã nguồn, 
+            Tải lên file <code>manifest.json</code> của ứng dụng. AI Security Auditor sẽ quét mã nguồn, 
             sau đó Neo mã (Anchor) lên Blockchain (U2U Network) để đảm bảo tính toàn vẹn.
           </p>
 
@@ -259,14 +243,22 @@ const MarketplaceAdmin: React.FC = () => {
             type="file"
             accept=".json"
             onChange={handleManifestUpload}
-            style={{ marginTop: 16 }}
+            style={{ marginTop: 16, color: '#000' }}
           />
           {uploadError && <p style={{ color: '#ef4444', marginTop: 12 }}>❌ {uploadError}</p>}
           {uploadSuccess && <p style={{ color: '#10b981', marginTop: 12 }}>✅ Tải lên & Audit thành công!</p>}
+        </div>
+      )}
+
+      {/* ─── Tab: Listings ─────────────────────────────────────────────────── */}
+      {activeTab === 'listings' && !isLoading && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {listings.map(renderCard)}
+          {listings.length === 0 && <p style={{ color: '#000' }}>Chưa có ứng dụng nào.</p>}
         </div>
       )}
     </div>
   );
 };
 
-export default MarketplaceAdmin;
+export default EcosystemPublisher;

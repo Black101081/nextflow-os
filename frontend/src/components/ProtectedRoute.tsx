@@ -1,22 +1,22 @@
 import React from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
-  userRole?: string;
-  allowedRoles: string[];
+  allowedRoles?: string[];
   children: React.ReactNode;
 }
 
-export default function ProtectedRoute({ userRole, allowedRoles, children }: ProtectedRouteProps) {
-  if (!userRole) {
-    return (
-      <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-        Đang tải thông tin phân quyền...
-      </div>
-    );
+export default function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) {
+  const { isAuthenticated, user } = useAuth();
+  const location = useLocation();
+
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
   
-  // SME_LEADER luôn có full quyền
-  if (userRole === 'SME_LEADER' || allowedRoles.includes(userRole)) {
+  // SME_LEADER luôn có full quyền hoặc platform admin
+  if (user.role === 'SME_LEADER' || user.role === 'PLATFORM_ADMIN' || !allowedRoles || allowedRoles.includes(user.role)) {
     return <>{children}</>;
   }
 
@@ -39,7 +39,7 @@ export default function ProtectedRoute({ userRole, allowedRoles, children }: Pro
       </div>
       <h3 style={{ color: '#ef4444', marginTop: 0, fontSize: '18px' }}>Truy Cập Bị Từ Chối</h3>
       <p style={{ color: 'var(--text-muted)', fontSize: '14px', maxWidth: '400px', margin: '0 auto' }}>
-        Tài khoản của bạn (<strong>{userRole}</strong>) không có đủ quyền để truy cập tính năng này. Vui lòng liên hệ Leader để được cấp quyền.
+        Tài khoản của bạn (<strong>{user.role}</strong>) không có đủ quyền để truy cập tính năng này. Vui lòng liên hệ Leader để được cấp quyền.
       </p>
     </div>
   );

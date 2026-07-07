@@ -179,11 +179,8 @@ pub async fn get_work_item(
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, Response> {
     let row_opt = sqlx::query(
-        r#"SELECT w.id, w.queue_id, w.title, w.status, w.priority, w.category, w.created_at, w.due_at, w.version, w.metadata, w.assignee_id,
-                  i.status as invoice_status, i.amount::float8 as invoice_amount, i.payment_link_url,
-                  i.data_hash as invoice_data_hash, i.tx_hash as invoice_tx_hash
+        r#"SELECT w.id, w.queue_id, w.title, w.status, w.priority, w.category, w.created_at, w.due_at, w.version, w.metadata, w.assignee_id
            FROM nf_core.work_items w
-           LEFT JOIN nf_core.invoices i ON w.id = i.work_item_id
            WHERE w.id = $1 AND w.tenant_id = $2"#
     )
     .bind(id)

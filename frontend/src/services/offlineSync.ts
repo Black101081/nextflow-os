@@ -1,4 +1,4 @@
-import { openDB, IDBPDatabase } from 'idb';
+import { openDB, type IDBPDatabase } from 'idb';
 
 const DB_NAME = 'nextflow_offline_db';
 const DB_VERSION = 1;

@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DollarSign, CheckCircle, Clock, ExternalLink } from 'lucide-react';
-import { apiService, AuthConfig } from '../services/api';
+import { apiService } from '../services/api';
 
-interface BillingDashboardProps {
-  auth: AuthConfig;
-}
+import { useAuth } from '../contexts/AuthContext';
 
-export default function BillingDashboard({ auth }: BillingDashboardProps) {
+export default function BillingDashboard() {
+  const { user } = useAuth();
+  const auth = { tenantId: user?.tenant_id || '', apiKey: '' };
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -122,3 +122,6 @@ export default function BillingDashboard({ auth }: BillingDashboardProps) {
     </div>
   );
 }
+
+
+

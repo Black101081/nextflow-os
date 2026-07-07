@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+
 import { apiService } from '../services/api';
 import { 
   Layers, 
@@ -8,10 +9,10 @@ import {
   AlertCircle, 
   Globe, 
   RefreshCw,
-  LogOut,
   Sliders,
   DollarSign
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Tenant {
   id: string;
@@ -22,12 +23,8 @@ interface Tenant {
   created_at: string;
 }
 
-interface PlatformAdminProps {
-  adminKey: string;
-  onLogout: () => void;
-}
-
-export default function PlatformAdmin({ adminKey, onLogout }: PlatformAdminProps) {
+export default function PlatformAdmin() {
+  const { user } = useAuth();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +46,7 @@ export default function PlatformAdmin({ adminKey, onLogout }: PlatformAdminProps
     setLoading(true);
     setError(null);
     try {
-      const data = await apiService.getPlatformTenants(adminKey);
+      const data = await apiService.getPlatformTenants();
       setTenants(data);
     } catch (err: any) {
       setError(err.message || 'Không thể tải danh sách Tenant.');
@@ -59,8 +56,10 @@ export default function PlatformAdmin({ adminKey, onLogout }: PlatformAdminProps
   };
 
   useEffect(() => {
-    fetchTenants();
-  }, [adminKey]);
+    if (user?.role === 'PLATFORM_ADMIN') {
+      fetchTenants();
+    }
+  }, [user]);
 
   const triggerNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
@@ -76,7 +75,7 @@ export default function PlatformAdmin({ adminKey, onLogout }: PlatformAdminProps
 
     try {
       setLoading(true);
-      const res = await apiService.createPlatformTenant(adminKey, {
+      const res = await apiService.createPlatformTenant({
         company_name: companyName,
         domain: domain,
         subscription_tier: tier,
@@ -106,7 +105,7 @@ export default function PlatformAdmin({ adminKey, onLogout }: PlatformAdminProps
 
   const handleUpdateTenant = async (id: string, payload: { status?: string; subscription_tier?: string }) => {
     try {
-      await apiService.updatePlatformTenant(adminKey, id, payload);
+      await apiService.updatePlatformTenant(id, payload);
       triggerNotification('success', 'Cập nhật thông tin Tenant thành công.');
       fetchTenants();
     } catch (err: any) {
@@ -122,39 +121,22 @@ export default function PlatformAdmin({ adminKey, onLogout }: PlatformAdminProps
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', color: '#fff' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="brand-logo" style={{ width: '40px', height: '40px', fontSize: '18px' }}>NF</div>
-          <div>
-            <h1 style={{ fontSize: '22px', fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>Nextflow Platform Control Center</h1>
-            <span style={{ fontSize: '11px', color: 'var(--color-primary)', fontWeight: 700, textTransform: 'uppercase' }}>System Operator Shell</span>
-          </div>
+      {notification && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          right: '24px',
+          backgroundColor: notification.type === 'success' ? '#10b981' : '#ef4444',
+          color: '#fff',
+          padding: '12px 24px',
+          borderRadius: '8px',
+          zIndex: 9999,
+          fontWeight: 600,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+        }}>
+          {notification.message}
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {notification && (
-            <div style={{
-              backgroundColor: notification.type === 'success' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)',
-              border: `1px solid ${notification.type === 'success' ? 'var(--color-secondary)' : 'var(--color-accent)'}`,
-              color: notification.type === 'success' ? 'var(--color-secondary)' : 'var(--color-accent)',
-              padding: '6px 16px',
-              borderRadius: 'var(--radius-full)',
-              fontSize: '13px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <Check size={14} /> {notification.message}
-            </div>
-          )}
-          
-          <button onClick={onLogout} className="btn btn-secondary" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <LogOut size={16} /> Đăng xuất
-          </button>
-        </div>
-      </div>
-
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: createdTenant ? '1fr' : '2fr 1fr', gap: '24px', alignItems: 'start' }}>
         
         {/* Main Section: Created Tenant Modal OR Tenants List */}
@@ -240,7 +222,7 @@ export default function PlatformAdmin({ adminKey, onLogout }: PlatformAdminProps
                       </tr>
                     </thead>
                     <tbody>
-                      {tenants.map(t => (
+                      {tenants.map((t: any) => (
                         <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background-color 0.2s' }} className="table-row-hover">
                           <td style={{ padding: '12px', fontWeight: 600 }}>{t.company_name}</td>
                           <td style={{ padding: '12px', color: 'var(--text-dim)' }}>
@@ -398,3 +380,6 @@ export default function PlatformAdmin({ adminKey, onLogout }: PlatformAdminProps
     </div>
   );
 }
+
+
+

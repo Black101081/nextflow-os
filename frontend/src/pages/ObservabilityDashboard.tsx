@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Activity, ShieldCheck, Cpu, Database, AlertTriangle, PlayCircle } from 'lucide-react';
-import { apiService } from '../services/api';
+import { useState, useEffect } from 'react';
+import { Activity, Database, PlayCircle, ShieldCheck, Cpu } from 'lucide-react';
 
 export default function ObservabilityDashboard() {
   const [reports, setReports] = useState<any[]>([]);

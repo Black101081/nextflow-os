@@ -17,15 +17,92 @@ export interface WorkItemPayload {
   metadata?: any;
 }
 
-export const getHeaders = (auth: AuthConfig) => {
-  return {
+export const getHeaders = (auth?: any) => {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-Nextflow-Tenant-ID': auth.tenantId,
-    'X-Nextflow-API-Key': auth.apiKey,
   };
+  
+  const token = localStorage.getItem('nf_access_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  } else if (auth && auth.tenantId) {
+    headers['X-Nextflow-Tenant-ID'] = auth.tenantId;
+    headers['X-Nextflow-API-Key'] = auth.apiKey;
+  }
+  
+  return headers;
 };
 
 export const apiService = {
+  // 1. Phân loại tác vụ tự động bằng AI (Auto-Triage)
+  async autoTriageTask(auth: any, taskId: string, title: string, description?: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/intelligence/auto-triage`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({
+        task_id: taskId,
+        title: title,
+        description: description || null
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Lỗi khi phân tích tự động (AI Auto Triage)');
+    }
+    return res.json();
+  },
+  
+  // 2. Hỏi trợ lý ảo RAG Chatbot
+  async askAiAssistant(auth: any, question: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/intelligence/ask-assistant`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ question }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Lỗi khi gửi câu hỏi tới AI Assistant');
+    }
+    return res.json();
+  },
+  
+  // 3. Lấy danh sách Extensions trên Marketplace
+  async getMarketplaceExtensions(auth: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/marketplace/extensions`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) {
+      throw new Error('Lỗi khi lấy danh sách ứng dụng trên Marketplace');
+    }
+    return res.json();
+  },
+  
+  // 4. Lấy danh sách gợi ý ứng dụng thông minh từ AI
+  async getMarketplaceRecommendations(auth: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/marketplace/extensions/recommendations`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) {
+      throw new Error('Lỗi khi lấy gợi ý cài đặt ứng dụng');
+    }
+    return res.json();
+  },
+  
+  // 5. Gửi ứng dụng mới (Manifest) lên Marketplace
+  async submitExtension(auth: any, payload: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/marketplace/extensions/submit`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Lỗi khi đăng ký ứng dụng mới');
+    }
+    return res.json();
+  },
   // Check Backend health
   async checkHealth(): Promise<boolean> {
     try {
@@ -37,7 +114,7 @@ export const apiService = {
   },
 
   // 1. POST /api/v1/work-items (Tạo mới Task)
-  async createWorkItem(auth: AuthConfig, payload: WorkItemPayload) {
+  async createWorkItem(auth: any, payload: WorkItemPayload) {
     const res = await fetch(`${API_BASE_URL}/api/v1/work-items`, {
       method: 'POST',
       headers: getHeaders(auth),
@@ -51,7 +128,7 @@ export const apiService = {
   },
 
   // GET /api/v1/work-items (Lấy danh sách Tasks)
-  async getWorkItems(auth: AuthConfig) {
+  async getWorkItems(auth: any) {
     if (!offlineService.isOnline()) {
       return await offlineService.getWorkItemsFromCache();
     }
@@ -73,7 +150,7 @@ export const apiService = {
   },
 
   // 2. GET /api/v1/work-items/{id} (Chi tiết Task)
-  async getWorkItem(auth: AuthConfig, id: string) {
+  async getWorkItem(auth: any, id: string) {
     const res = await fetch(`${API_BASE_URL}/api/v1/work-items/${id}`, {
       method: 'GET',
       headers: getHeaders(auth),
@@ -85,7 +162,7 @@ export const apiService = {
   },
 
   // 3. PATCH /api/v1/work-items/{id}/status (Cập nhật trạng thái)
-  async updateWorkItemStatus(auth: AuthConfig, id: string, status: string) {
+  async updateWorkItemStatus(auth: any, id: string, status: string) {
     if (!offlineService.isOnline()) {
       await offlineService.enqueueSyncTask({
         id: crypto.randomUUID(),
@@ -125,7 +202,7 @@ export const apiService = {
   },
 
   // 4. POST /api/v1/work-items/{id}/route (Định tuyến thủ công)
-  async routeWorkItem(auth: AuthConfig, id: string, targetQueueId: string, assigneeId?: string) {
+  async routeWorkItem(auth: any, id: string, targetQueueId: string, assigneeId?: string) {
     const res = await fetch(`${API_BASE_URL}/api/v1/work-items/${id}/route`, {
       method: 'POST',
       headers: getHeaders(auth),
@@ -143,7 +220,7 @@ export const apiService = {
   },
 
   // 5. POST /api/v1/queues (Tạo Queue mới)
-  async createQueue(auth: AuthConfig, id: string, name: string, category: string) {
+  async createQueue(auth: any, id: string, name: string, category: string) {
     const res = await fetch(`${API_BASE_URL}/api/v1/queues`, {
       method: 'POST',
       headers: getHeaders(auth),
@@ -156,7 +233,7 @@ export const apiService = {
   },
 
   // 6. GET /api/v1/queues/{id}/members (Lấy danh sách thành viên)
-  async getQueueMembers(auth: AuthConfig, queueId: string) {
+  async getQueueMembers(auth: any, queueId: string) {
     const res = await fetch(`${API_BASE_URL}/api/v1/queues/${queueId}/members`, {
       method: 'GET',
       headers: getHeaders(auth),
@@ -168,7 +245,7 @@ export const apiService = {
   },
 
   // 7. GET /api/v1/analytics/kpis (Lấy chỉ số thống kê KPIs)
-  async getKpis(auth: AuthConfig) {
+  async getKpis(auth: any) {
     const res = await fetch(`${API_BASE_URL}/api/v1/analytics/kpis`, {
       method: 'GET',
       headers: getHeaders(auth),
@@ -180,7 +257,7 @@ export const apiService = {
   },
 
   // 8. GET /api/v1/queues (Lấy danh sách Queues từ DB)
-  async getQueues(auth: AuthConfig) {
+  async getQueues(auth: any) {
     const res = await fetch(`${API_BASE_URL}/api/v1/queues`, {
       method: 'GET',
       headers: getHeaders(auth),
@@ -197,7 +274,7 @@ export const apiService = {
   },
 
   // 9. POST /api/v1/queues/:id/claim-next (Claim task tiếp theo)
-  async claimNextTask(auth: AuthConfig, queueId: string, userId?: string) {
+  async claimNextTask(auth: any, queueId: string, userId?: string) {
     const headers: any = getHeaders(auth);
     if (userId) {
       headers['Authorization'] = `Bearer ${userId}`;
@@ -214,7 +291,7 @@ export const apiService = {
   },
 
   // 10. POST /api/v1/work-items/:id/escalate (Leo thang task)
-  async escalateTask(auth: AuthConfig, id: string, reason: string, exceptionType?: string) {
+  async escalateTask(auth: any, id: string, reason: string, exceptionType?: string) {
     const res = await fetch(`${API_BASE_URL}/api/v1/work-items/${id}/escalate`, {
       method: 'POST',
       headers: getHeaders(auth),
@@ -228,7 +305,7 @@ export const apiService = {
   },
 
   // 10b. GET /api/v1/work-items/exceptions
-  async getExceptions(auth: AuthConfig) {
+  async getExceptions(auth: any) {
     const res = await fetch(`${API_BASE_URL}/api/v1/work-items/exceptions`, {
       method: 'GET',
       headers: getHeaders(auth),
@@ -238,7 +315,7 @@ export const apiService = {
   },
 
   // 10c. POST /api/v1/work-items/exceptions/:id/resolve
-  async resolveException(auth: AuthConfig, id: string, decision: 'APPROVED' | 'REJECTED') {
+  async resolveException(auth: any, id: string, decision: 'APPROVED' | 'REJECTED') {
     const res = await fetch(`${API_BASE_URL}/api/v1/work-items/exceptions/${id}/resolve`, {
       method: 'POST',
       headers: getHeaders(auth),
@@ -253,7 +330,7 @@ export const apiService = {
 
 
   // 11. GET /api/v1/connectors/configs (Lấy danh sách connectors)
-  async getConnectors(auth: AuthConfig) {
+  async getConnectors(auth: any) {
     const res = await fetch(`${API_BASE_URL}/api/v1/connectors/configs`, {
       method: 'GET',
       headers: getHeaders(auth),
@@ -263,7 +340,7 @@ export const apiService = {
   },
 
   // 12. POST /api/v1/connectors/configs (Tạo connector mới)
-  async createConnector(auth: AuthConfig, connectorName: string, credentials: string) {
+  async createConnector(auth: any, connectorName: string, credentials: string) {
     const res = await fetch(`${API_BASE_URL}/api/v1/connectors/configs`, {
       method: 'POST',
       headers: getHeaders(auth),
@@ -281,7 +358,7 @@ export const apiService = {
   // =====================================================================
 
   // 13. GET /api/v1/ai/health — kiểm tra trạng thái Python AI service
-  async checkAiHealth(auth: AuthConfig): Promise<{ ai_service: string; detail?: unknown }> {
+  async checkAiHealth(auth: any): Promise<{ ai_service: string; detail?: unknown }> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/ai/health`, {
         headers: getHeaders(auth),
@@ -294,7 +371,7 @@ export const apiService = {
   },
 
   // 14. POST /api/v1/ai/sla-risk — tính điểm rủi ro SLA cho một work item
-  async getSlaRisk(auth: AuthConfig, payload: {
+  async getSlaRisk(auth: any, payload: {
     work_item_id: string;
     age_minutes: number;
     time_to_sla_minutes: number;
@@ -315,7 +392,7 @@ export const apiService = {
   },
 
   // 15. POST /api/v1/ai/routing-recommend — đề xuất top-3 operators
-  async getRoutingRecommendation(auth: AuthConfig, payload: {
+  async getRoutingRecommendation(auth: any, payload: {
     queue_id: string;
     task_category: string;
     task_priority: string;
@@ -331,7 +408,7 @@ export const apiService = {
   },
 
   // 16. POST /api/v1/ai/rag-query — hỏi RAG SOP Assistant
-  async queryRagAssistant(auth: AuthConfig, question: string, topK = 5) {
+  async queryRagAssistant(auth: any, question: string, topK = 5) {
     const res = await fetch(`${API_BASE_URL}/api/v1/ai/rag-query`, {
       method: 'POST',
       headers: getHeaders(auth),
@@ -342,7 +419,7 @@ export const apiService = {
   },
 
   // 17. POST /api/v1/tenants/initialize-template (Cấu hình mẫu Tenant)
-  async initializeTenantTemplate(auth: AuthConfig, templateId: string, wipeExisting: boolean) {
+  async initializeTenantTemplate(auth: any, templateId: string, wipeExisting: boolean) {
     const res = await fetch(`${API_BASE_URL}/api/v1/tenants/initialize-template`, {
       method: 'POST',
       headers: getHeaders(auth),
@@ -356,7 +433,7 @@ export const apiService = {
   },
 
   // 18. GET /api/v1/tenants/policies (Lấy chính sách)
-  async getTenantPolicies(auth: AuthConfig) {
+  async getTenantPolicies(auth: any) {
     const res = await fetch(`${API_BASE_URL}/api/v1/tenants/policies`, {
       method: 'GET',
       headers: getHeaders(auth),
@@ -366,7 +443,7 @@ export const apiService = {
   },
 
   // 19. POST /api/v1/tenants/policies (Cập nhật chính sách)
-  async updateTenantPolicies(auth: AuthConfig, policies: { sla_minutes_default: number; sla_minutes_high: number; auto_assignment_enabled: boolean; routing_mode: string }) {
+  async updateTenantPolicies(auth: any, policies: { sla_minutes_default: number; sla_minutes_high: number; auto_assignment_enabled: boolean; routing_mode: string }) {
     const res = await fetch(`${API_BASE_URL}/api/v1/tenants/policies`, {
       method: 'POST',
       headers: getHeaders(auth),
@@ -380,26 +457,20 @@ export const apiService = {
   },
 
   // 20. GET /api/v1/platform/tenants (List all tenants)
-  async getPlatformTenants(adminKey: string) {
+  async getPlatformTenants() {
     const res = await fetch(`${API_BASE_URL}/api/v1/platform/tenants`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-platform-admin-key': adminKey,
-      },
+      headers: getHeaders(),
     });
     if (!res.ok) throw new Error('Không thể tải danh sách Tenant của hệ thống.');
     return res.json();
   },
 
   // 21. POST /api/v1/platform/tenants (Create new tenant)
-  async createPlatformTenant(adminKey: string, payload: { company_name: string; domain: string; subscription_tier?: string; admin_email: string; admin_first_name: string; admin_last_name: string }) {
+  async createPlatformTenant(payload: { company_name: string; domain: string; subscription_tier?: string; admin_email: string; admin_first_name: string; admin_last_name: string }) {
     const res = await fetch(`${API_BASE_URL}/api/v1/platform/tenants`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-platform-admin-key': adminKey,
-      },
+      headers: getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
@@ -410,13 +481,10 @@ export const apiService = {
   },
 
   // 22. PATCH /api/v1/platform/tenants/:id (Update tenant)
-  async updatePlatformTenant(adminKey: string, id: string, payload: { status?: string; subscription_tier?: string }) {
+  async updatePlatformTenant(id: string, payload: { status?: string; subscription_tier?: string }) {
     const res = await fetch(`${API_BASE_URL}/api/v1/platform/tenants/${id}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-platform-admin-key': adminKey,
-      },
+      headers: getHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
@@ -436,7 +504,7 @@ export const apiService = {
   },
 
   // 24. GET /api/v1/tenants/users (List all users in tenant)
-  async getTenantUsers(auth: AuthConfig) {
+  async getTenantUsers(auth: any) {
     const res = await fetch(`${API_BASE_URL}/api/v1/tenants/users`, {
       method: 'GET',
       headers: getHeaders(auth),
@@ -446,7 +514,7 @@ export const apiService = {
   },
 
   // 25. POST /api/v1/tenants/users (Create user in tenant)
-  async createTenantUser(auth: AuthConfig, payload: { email: string; first_name: string; last_name: string; role: string }) {
+  async createTenantUser(auth: any, payload: { email: string; first_name: string; last_name: string; role: string }) {
     const res = await fetch(`${API_BASE_URL}/api/v1/tenants/users`, {
       method: 'POST',
       headers: getHeaders(auth),
@@ -460,7 +528,7 @@ export const apiService = {
   },
 
   // 26. PATCH /api/v1/tenants/users/:id (Update user in tenant)
-  async updateTenantUser(auth: AuthConfig, userId: string, payload: { first_name?: string; last_name?: string; role?: string; is_active?: boolean }) {
+  async updateTenantUser(auth: any, userId: string, payload: { first_name?: string; last_name?: string; role?: string; is_active?: boolean }) {
     const res = await fetch(`${API_BASE_URL}/api/v1/tenants/users/${userId}`, {
       method: 'PATCH',
       headers: getHeaders(auth),
@@ -474,7 +542,7 @@ export const apiService = {
   },
 
   // 27. DELETE /api/v1/tenants/users/:id (Delete user from tenant)
-  async deleteTenantUser(auth: AuthConfig, userId: string) {
+  async deleteTenantUser(auth: any, userId: string) {
     const res = await fetch(`${API_BASE_URL}/api/v1/tenants/users/${userId}`, {
       method: 'DELETE',
       headers: getHeaders(auth),
@@ -484,7 +552,7 @@ export const apiService = {
   },
 
   // 28. POST /api/v1/queues/:id/members (Add member to queue)
-  async addQueueMember(auth: AuthConfig, queueId: string, userId: string) {
+  async addQueueMember(auth: any, queueId: string, userId: string) {
     const res = await fetch(`${API_BASE_URL}/api/v1/queues/${queueId}/members`, {
       method: 'POST',
       headers: getHeaders(auth),
@@ -498,7 +566,7 @@ export const apiService = {
   },
 
   // 29. DELETE /api/v1/queues/:id/members/:user_id (Remove member from queue)
-  async removeQueueMember(auth: AuthConfig, queueId: string, userId: string) {
+  async removeQueueMember(auth: any, queueId: string, userId: string) {
     const res = await fetch(`${API_BASE_URL}/api/v1/queues/${queueId}/members/${userId}`, {
       method: 'DELETE',
       headers: getHeaders(auth),
@@ -511,7 +579,7 @@ export const apiService = {
   // =====================================================================
 
   // 30. GET /api/v1/billing/invoices (Lấy danh sách hóa đơn)
-  async getInvoices(auth: AuthConfig) {
+  async getInvoices(auth: any) {
     const res = await fetch(`${API_BASE_URL}/api/v1/billing/invoices`, {
       method: 'GET',
       headers: getHeaders(auth),
@@ -521,7 +589,7 @@ export const apiService = {
   },
 
   // 31. POST /api/v1/billing/invoices (Tạo hóa đơn & Payment link)
-  async createInvoice(auth: AuthConfig, payload: { work_item_id: string; amount: number; due_date?: string }) {
+  async createInvoice(auth: any, payload: { work_item_id: string; amount: number; due_date?: string }) {
     const res = await fetch(`${API_BASE_URL}/api/v1/billing/invoices`, {
       method: 'POST',
       headers: getHeaders(auth),

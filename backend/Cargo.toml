@@ -25,6 +25,7 @@ hmac = "0.12"
 rand = "0.8"
 lazy_static = "1.4"
 prometheus = { version = "0.13", features = ["process"] }
+regex = "1.12.4"
 
 
 [dev-dependencies]
