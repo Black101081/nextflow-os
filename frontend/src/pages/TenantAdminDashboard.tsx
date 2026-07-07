@@ -1491,6 +1491,13 @@ export default function TenantAdminDashboard() {
             >
               ✨ No-Code Builder
             </button>
+            <button 
+              onClick={() => setActiveTab('sop_rag')} 
+              className={`btn ${activeTab === 'sop_rag' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '6px 10px', fontSize: '12px', flex: '1 0 auto', background: activeTab === 'sop_rag' ? '#8b5cf6' : '#1e293b', border: '1px solid #8b5cf6' }}
+            >
+              📚 Quy trình SOP (AI & Web3)
+            </button>
           </div>
 
           {activeTab === 'nocode_builder' && (
@@ -1514,6 +1521,10 @@ export default function TenantAdminDashboard() {
                 onSubmit={(data) => alert("Dữ liệu chuẩn bị được nạp vào Entity Records và chạy qua Workflow Engine:\\n" + JSON.stringify(data, null, 2))}
               />
             </div>
+          )}
+
+          {activeTab === 'sop_rag' && (
+            <SopRagManager auth={auth} />
           )}
 
           {activeTab === 'inbox' && (
@@ -3022,6 +3033,175 @@ export default function TenantAdminDashboard() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function SopRagManager({ auth }: { auth: any }) {
+  const [docs, setDocs] = React.useState<any[]>([]);
+  const [title, setTitle] = React.useState('');
+  const [content, setContent] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [step, setStep] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [success, setSuccess] = React.useState('');
+
+  const fetchDocs = async () => {
+    try {
+      const res = await apiService.listKnowledgeBase(auth);
+      if (res.status === 'success') {
+        setDocs(res.data);
+      }
+    } catch (err: any) {
+      console.error(err);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchDocs();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !content.trim()) return;
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      setStep('1. Tính toán mã băm SHA-256 chống giả mạo...');
+      await new Promise(r => setTimeout(r, 600));
+      
+      setStep('2. Neo chứng chỉ tri thức lên Blockchain U2U Network...');
+      await new Promise(r => setTimeout(r, 800));
+      
+      setStep('3. Đang ghi nhận vào cơ sở dữ liệu và kích hoạt AI Reindexing...');
+      const res = await apiService.createKnowledgeBase(auth, title, content);
+      
+      setStep('4. Cập nhật không gian vectơ FAISS hoàn tất!');
+      await new Promise(r => setTimeout(r, 500));
+      
+      setSuccess(`Thêm SOP thành công! Mã giao dịch Web3: ${res.data.tx_hash}`);
+      setTitle('');
+      setContent('');
+      fetchDocs();
+    } catch (err: any) {
+      setError(err.message || 'Lỗi khi lưu quy trình.');
+    } finally {
+      setLoading(false);
+      setStep('');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa quy trình này?')) return;
+    try {
+      await apiService.deleteKnowledgeBase(auth, id);
+      fetchDocs();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <div className="panel" style={{ padding: '20px' }}>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-white mb-2">Quản Lý Quy Trình Vận Hành Tiêu Chuẩn (SOP Knowledge Base)</h2>
+        <p className="text-slate-400">
+          Nạp các quy trình của doanh nghiệp để Trợ lý RAG AI học và hỗ trợ nhân viên vận hành.
+          Mỗi quy trình tải lên được tự động băm (Hash SHA-256) và neo (Anchor) lên Blockchain để chống giả mạo quy trình.
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        {/* Cột 1: Form Thêm Quy Trình */}
+        <div className="panel-card" style={{ padding: '16px', background: '#1e293b' }}>
+          <h3 className="text-lg font-bold text-white mb-4">✍ Nạp Quy Trình Mới</h3>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <label className="label">Tiêu đề quy trình (Ví dụ: Quy trình bàn giao hàng lẻ)</label>
+              <input
+                type="text"
+                className="input"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="Nhập tiêu đề..."
+                required
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label className="label">Nội dung chi tiết (Markdown / Văn bản thuần)</label>
+              <textarea
+                className="input"
+                style={{ height: '200px', resize: 'vertical', fontFamily: 'monospace' }}
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                placeholder="Nhập nội dung quy trình chi tiết..."
+                required
+                disabled={loading}
+              />
+            </div>
+            
+            {loading && (
+              <div style={{ background: '#0f172a', padding: '10px', borderRadius: '4px', border: '1px solid #3b82f6', color: '#60a5fa' }}>
+                <span className="spinner-border text-primary mr-2" />
+                {step}
+              </div>
+            )}
+
+            {success && (
+              <div style={{ background: '#064e3b', padding: '10px', borderRadius: '4px', border: '1px solid #10b981', color: '#34d399' }}>
+                {success}
+              </div>
+            )}
+
+            {error && (
+              <div style={{ background: '#7f1d1d', padding: '10px', borderRadius: '4px', border: '1px solid #ef4444', color: '#f87171' }}>
+                {error}
+              </div>
+            )}
+
+            <button type="submit" className="btn btn-primary" style={{ padding: '10px' }} disabled={loading}>
+              {loading ? 'Đang xử lý...' : 'Nạp Quy Trình & Neo Web3'}
+            </button>
+          </form>
+        </div>
+
+        {/* Cột 2: Danh sách Quy Trình Đang Có */}
+        <div className="panel-card" style={{ padding: '16px', background: '#1e293b' }}>
+          <h3 className="text-lg font-bold text-white mb-4">📋 Quy Trình Hiện Có ({docs.length})</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '450px', overflowY: 'auto' }}>
+            {docs.length === 0 ? (
+              <p className="text-slate-500 text-center py-8">Chưa có quy trình nào được nạp.</p>
+            ) : (
+              docs.map((doc: any) => (
+                <div key={doc.id} style={{ border: '1px solid #334155', borderRadius: '6px', padding: '12px', background: '#0f172a' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                    <h4 style={{ fontWeight: 'bold', color: 'white', margin: 0 }}>{doc.title}</h4>
+                    <button onClick={() => handleDelete(doc.id)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px' }}>
+                      Xóa
+                    </button>
+                  </div>
+                  <p style={{ color: '#94a3b8', fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '8px' }}>
+                    {doc.content}
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '10px' }}>
+                    <span style={{ background: '#1e293b', color: '#94a3b8', padding: '2px 6px', borderRadius: '3px', fontFamily: 'monospace' }}>
+                      Hash: {doc.content_hash.slice(0, 10)}...
+                    </span>
+                    {doc.tx_hash && (
+                      <span style={{ background: '#064e3b', color: '#34d399', padding: '2px 6px', borderRadius: '3px', fontWeight: 'bold' }}>
+                        ✓ Web3: {doc.tx_hash.slice(0, 10)}...
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

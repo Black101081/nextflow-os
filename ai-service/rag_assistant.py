@@ -155,8 +155,8 @@ def _load_and_chunk_docs(docs_dir: Path, chunk_size: int = 400, overlap: int = 8
 # FAISS index builder
 # --------------------------------------------------------------------------
 _embed_model_cache = None
-_index_cache       = None
-_chunks_cache: Optional[list[DocChunk]] = None
+# Cache dictionaries mapping tenant_id (or 'global') to (index, chunks)
+_tenant_indices_cache = {}
 
 def _get_embed_model():
     global _embed_model_cache
@@ -166,54 +166,79 @@ def _get_embed_model():
         print("[RAG] ✅ Model loaded.")
     return _embed_model_cache
 
-def _build_or_load_index() -> tuple:
-    """Tải FAISS index từ disk nếu có, ngược lại build mới."""
-    global _index_cache, _chunks_cache
+def _build_or_load_index(tenant_id: Optional[str] = None) -> tuple:
+    """Tải FAISS index của Tenant từ disk nếu có, ngược lại build mới từ thư mục Tenant hoặc fallback."""
+    global _tenant_indices_cache
 
-    if _index_cache is not None:
-        return _index_cache, _chunks_cache
+    cache_key = tenant_id if tenant_id else 'global'
+    if cache_key in _tenant_indices_cache:
+        return _tenant_indices_cache[cache_key]
 
     if not ML_AVAILABLE:
         return None, []
 
-    INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # Định nghĩa đường dẫn dựa trên tenant_id
+    if tenant_id:
+        tenant_model_dir = Path(__file__).parent / "model" / tenant_id
+        tenant_docs_dir = Path(__file__).parent.parent / "docs" / tenant_id
+        index_path = tenant_model_dir / "rag_faiss.index"
+        chunks_path = tenant_model_dir / "rag_chunks.json"
+    else:
+        tenant_docs_dir = DOCS_DIR
+        index_path = INDEX_PATH
+        chunks_path = CHUNKS_PATH
 
-    # Tải từ disk nếu đã build
-    if INDEX_PATH.exists() and CHUNKS_PATH.exists():
-        print("[RAG] Tải FAISS index từ disk...")
-        index = faiss.read_index(str(INDEX_PATH))
-        with open(CHUNKS_PATH, "r", encoding="utf-8") as f:
-            chunks_data = json.load(f)
-        chunks = [DocChunk(**c) for c in chunks_data]
-        _index_cache  = index
-        _chunks_cache = chunks
-        print(f"[RAG] ✅ Loaded {len(chunks)} chunks từ index.")
-        return index, chunks
+    index_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Build mới
-    print(f"[RAG] Building FAISS index từ docs/ ({DOCS_DIR})...")
-    chunks = _load_and_chunk_docs(DOCS_DIR)
+    # 1. Tải từ disk nếu đã build
+    if index_path.exists() and chunks_path.exists():
+        print(f"[RAG] Tải FAISS index từ disk cho tenant={cache_key}...")
+        try:
+            index = faiss.read_index(str(index_path))
+            with open(chunks_path, "r", encoding="utf-8") as f:
+                chunks_data = json.load(f)
+            chunks = [DocChunk(**c) for c in chunks_data]
+            _tenant_indices_cache[cache_key] = (index, chunks)
+            print(f"[RAG] ✅ Loaded {len(chunks)} chunks cho tenant={cache_key}.")
+            return index, chunks
+        except Exception as e:
+            print(f"[RAG] Lỗi load index của tenant={cache_key} từ disk: {e}")
+
+    # 2. Build mới từ thư mục docs tương ứng
+    print(f"[RAG] Building FAISS index cho tenant={cache_key} từ {tenant_docs_dir}...")
+    if tenant_id and not tenant_docs_dir.exists():
+        # Nếu thư mục docs của tenant chưa có, thử fallback sang global docs làm mặc định
+        print(f"[RAG] Thư mục tenant={cache_key} trống, fallback sang global docs...")
+        tenant_docs_dir = DOCS_DIR
+
+    chunks = _load_and_chunk_docs(tenant_docs_dir)
     if not chunks:
-        print("[RAG] ⚠️ Không tìm thấy docs để index.")
+        print(f"[RAG] ⚠️ Không tìm thấy docs để index cho tenant={cache_key}.")
+        # Nếu không có docs nào, fallback dùng index global
+        if tenant_id:
+            print(f"[RAG] Fallback sang global index cho tenant={cache_key}...")
+            return _build_or_load_index(None)
         return None, []
 
     embed_model = _get_embed_model()
     texts = [c.text for c in chunks]
-    embeddings = embed_model.encode(texts, show_progress_bar=True, batch_size=32)
+    embeddings = embed_model.encode(texts, show_progress_bar=False, batch_size=32)
     embeddings = embeddings.astype("float32")
     faiss.normalize_L2(embeddings)
 
     dim   = embeddings.shape[1]
-    index = faiss.IndexFlatIP(dim)    # Inner Product = cosine (after normalize)
+    index = faiss.IndexFlatIP(dim)
     index.add(embeddings)
 
-    faiss.write_index(index, str(INDEX_PATH))
-    with open(CHUNKS_PATH, "w", encoding="utf-8") as f:
-        json.dump([vars(c) for c in chunks], f, ensure_ascii=False, indent=2)
+    try:
+        faiss.write_index(index, str(index_path))
+        with open(chunks_path, "w", encoding="utf-8") as f:
+            json.dump([vars(c) for c in chunks], f, ensure_ascii=False, indent=2)
+        print(f"[RAG] ✅ Index xây xong và lưu cho tenant={cache_key} với {len(chunks)} chunks.")
+    except Exception as e:
+        print(f"[RAG] Lỗi lưu index của tenant={cache_key}: {e}")
 
-    print(f"[RAG] ✅ Index xây xong với {len(chunks)} chunks.")
-    _index_cache  = index
-    _chunks_cache = chunks
+    _tenant_indices_cache[cache_key] = (index, chunks)
     return index, chunks
 
 
@@ -442,7 +467,7 @@ def query_rag(question: str, top_k: int = 5, tenant_id: Optional[str] = None) ->
             "mode": "UNAVAILABLE",
         }
 
-    index, chunks = _build_or_load_index()
+    index, chunks = _build_or_load_index(tenant_id)
 
     if index is None or not chunks:
         return {
@@ -491,3 +516,90 @@ def build_index_if_needed():
     """Gọi khi khởi động service để pre-build FAISS index."""
     if ML_AVAILABLE:
         _build_or_load_index()
+
+def reindex_tenant(tenant_id: str, documents: list[dict]) -> dict:
+    """
+    Nhận danh sách tài liệu SOP của Tenant gửi từ Backend, chunking,
+    tạo embeddings và build FAISS index mới, lưu đè lên disk.
+    """
+    global _tenant_indices_cache
+
+    if not ML_AVAILABLE:
+        return {"status": "error", "message": "ML dependencies unavailable"}
+
+    cache_key = tenant_id
+    tenant_model_dir = Path(__file__).parent / "model" / tenant_id
+    index_path = tenant_model_dir / "rag_faiss.index"
+    chunks_path = tenant_model_dir / "rag_chunks.json"
+
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 1. Chuyển đổi list documents thành DocChunks
+    chunks = []
+    chunk_idx = 0
+    for doc in documents:
+        title = doc.get("title", "Untitled")
+        content = doc.get("content", "").strip()
+        doc_id = doc.get("id", f"doc_{chunk_idx}")
+        
+        if len(content) < 40:
+            continue
+
+        # Split section theo ## heading
+        sections = re.split(r'\n(?=#{1,3} )', content)
+        for sec in sections:
+            lines = sec.strip().split("\n")
+            if not lines:
+                continue
+            section_title = lines[0].replace("#", "").strip()
+            section_body = "\n".join(lines[1:]).strip()
+
+            if len(section_body) < 40:
+                section_body = sec.strip()
+                section_title = title
+
+            # Chunk theo sliding window
+            words = section_body.split()
+            chunk_size = 400
+            overlap = 80
+            for start in range(0, len(words), chunk_size - overlap):
+                chunk_words = words[start : start + chunk_size]
+                chunk_text = " ".join(chunk_words)
+                if len(chunk_text) < 40:
+                    continue
+
+                chunks.append(DocChunk(
+                    chunk_id=f"{doc_id}_s{chunk_idx}",
+                    source_file=title,
+                    section=section_title[:80],
+                    text=chunk_text
+                ))
+                chunk_idx += 1
+
+    if not chunks:
+        return {"status": "success", "message": "Không có tài liệu nào đủ dài để index.", "chunks_count": 0}
+
+    # 2. Sinh embeddings & Build FAISS index
+    embed_model = _get_embed_model()
+    texts = [c.text for c in chunks]
+    embeddings = embed_model.encode(texts, show_progress_bar=False, batch_size=32)
+    embeddings = embeddings.astype("float32")
+    faiss.normalize_L2(embeddings)
+
+    dim = embeddings.shape[1]
+    index = faiss.IndexFlatIP(dim)
+    index.add(embeddings)
+
+    # 3. Lưu xuống disk và update cache in-memory
+    faiss.write_index(index, str(index_path))
+    with open(chunks_path, "w", encoding="utf-8") as f:
+        json.dump([vars(c) for c in chunks], f, ensure_ascii=False, indent=2)
+
+    _tenant_indices_cache[cache_key] = (index, chunks)
+    print(f"[RAG] Reindexed tenant={tenant_id} với {len(chunks)} chunks thành công.")
+
+    return {
+        "status": "success",
+        "message": f"Đã xây dựng lại chỉ mục tri thức thành công với {len(chunks)} phân đoạn.",
+        "chunks_count": len(chunks)
+    }

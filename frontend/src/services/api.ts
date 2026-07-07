@@ -606,6 +606,45 @@ export const apiService = {
     }
     return res.json();
   },
+
+  // Lấy danh sách quy trình tri thức SOP
+  async listKnowledgeBase(auth: any) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/intelligence/knowledge-base`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) {
+      throw new Error('Không thể lấy danh sách quy trình tri thức.');
+    }
+    return res.json();
+  },
+
+  // Tạo quy trình tri thức mới (tự động băm & neo blockchain)
+  async createKnowledgeBase(auth: any, title: string, content: string) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/intelligence/knowledge-base`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ title, content }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Không thể tạo mới quy trình tri thức.');
+    }
+    return res.json();
+  },
+
+  // Xóa quy trình tri thức
+  async deleteKnowledgeBase(auth: any, id: string) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/intelligence/knowledge-base/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Không thể xóa quy trình tri thức.');
+    }
+    return res.json();
+  },
 };
 
 export interface TemplatePack {

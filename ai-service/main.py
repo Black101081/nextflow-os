@@ -21,7 +21,7 @@ from sla_risk_engine import (
     MODEL_PATH,
 )
 from routing_recommender import OperatorProfile, RoutingRequest, recommend_operators
-from rag_assistant import query_rag, build_index_if_needed
+from rag_assistant import query_rag, build_index_if_needed, reindex_tenant
 
 # --------------------------------------------------------------------------
 # Lifespan: khởi tạo models khi server start
@@ -163,6 +163,32 @@ async def rag_query_endpoint(req: RagQueryRequest):
             question=req.question,
             top_k=req.top_k,
             tenant_id=req.tenant_id,
+        )
+    )
+    return result
+
+
+# --------------------------------------------------------------------------
+class DocumentItem(BaseModel):
+    id: str
+    title: str
+    content: str
+
+class ReindexRequest(BaseModel):
+    tenant_id: str
+    documents: list[DocumentItem]
+
+@app.post("/reindex")
+async def reindex_endpoint(req: ReindexRequest):
+    """
+    Nhận danh sách tài liệu SOP từ Backend và rebuild FAISS index cho Tenant.
+    """
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None,
+        lambda: reindex_tenant(
+            tenant_id=req.tenant_id,
+            documents=[d.model_dump() for d in req.documents]
         )
     )
     return result

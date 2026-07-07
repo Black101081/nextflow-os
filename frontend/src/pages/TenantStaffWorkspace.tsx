@@ -255,6 +255,8 @@ export default function TenantStaffWorkspace() {
   const [aiScore, setAiScore] = useState(0);
   const [aiSource, setAiSource] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [isBlockchainVerified, setIsBlockchainVerified] = useState(false);
+  const [verificationTxHash, setVerificationTxHash] = useState('');
 
   // Dynamic vertical template packs
 
@@ -1624,6 +1626,8 @@ export default function TenantStaffWorkspace() {
                       const res = await apiService.askAiAssistant(auth, aiQuery);
                       setAiAnswer(res.data.answer);
                       setAiSource(res.data.source || '');
+                      setIsBlockchainVerified(res.data.is_blockchain_verified || false);
+                      setVerificationTxHash(res.data.verification_tx_hash || '');
                     } catch (err: any) {
                       triggerNotification('error', 'Lỗi khi gọi Trợ lý AI: ' + err.message);
                     } finally {
@@ -1655,8 +1659,15 @@ export default function TenantStaffWorkspace() {
                     }}>
                       <div style={{ color: '#fff' }}>{aiAnswer}</div>
                       {aiSource && (
-                        <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <CheckCircle size={10} /> Trích xuất từ: {aiSource} (Verified on Blockchain)
+                        <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--color-success)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <CheckCircle size={10} /> Trích xuất từ: {aiSource}
+                          </div>
+                          {isBlockchainVerified && (
+                            <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10b981', padding: '6px 10px', borderRadius: '4px', marginTop: '6px', fontFamily: 'monospace' }}>
+                              🛡️ <b>Blockchain Verified:</b> tx_hash = <span style={{ color: '#34d399' }}>{verificationTxHash}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

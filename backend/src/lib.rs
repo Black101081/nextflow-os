@@ -121,6 +121,8 @@ pub fn create_app(pool: sqlx::PgPool) -> axum::Router {
         // AI & Intelligence
         .route("/api/v1/intelligence/ask-assistant", post(intelligence::ask_assistant))
         .route("/api/v1/intelligence/auto-triage", post(intelligence::auto_triage))
+        .route("/api/v1/intelligence/knowledge-base", get(intelligence::list_knowledge_base).post(intelligence::create_knowledge_base))
+        .route("/api/v1/intelligence/knowledge-base/:id", delete(intelligence::delete_knowledge_base))
 
         // No-code / Dynamic Entities
         .route("/api/v1/meta/entities/:system_name/schema", get(entity_records::get_entity_schema))
