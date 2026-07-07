@@ -5,7 +5,8 @@ import Login from './pages/Login';
 
 // Layouts
 import PlatformLayout from './layouts/PlatformLayout';
-import TenantLayout from './layouts/TenantLayout';
+import SmeLeaderLayout from './layouts/SmeLeaderLayout';
+import SmeStaffLayout from './layouts/SmeStaffLayout';
 
 // Layer 1: Platform Admin
 import PlatformAdmin from './pages/PlatformAdmin';
@@ -42,43 +43,36 @@ export default function App() {
             <Route index element={<Navigate to="/platform/admin" replace />} />
           </Route>
 
-          {/* Layer 2 & 3: Tenant Routes */}
-          <Route path="/" element={<Navigate to="/workspace" replace />} />
-          <Route path="/" element={<TenantLayout />}>
-            {/* SME Leader Routes */}
-            <Route path="tenant/admin" element={
-              <ProtectedRoute allowedRoles={['SME_LEADER']}>
-                <TenantAdminDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="tenant/appstore" element={
-              <ProtectedRoute allowedRoles={['SME_LEADER']}>
-                <AppStore />
-              </ProtectedRoute>
-            } />
-            <Route path="tenant/billing" element={
-              <ProtectedRoute allowedRoles={['SME_LEADER']}>
-                <BillingDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="tenant/integrations" element={
-              <ProtectedRoute allowedRoles={['SME_LEADER']}>
-                <IntegrationHub />
-              </ProtectedRoute>
-            } />
-
-            {/* Shared Workspace Route */}
-            <Route path="workspace" element={
-              <ProtectedRoute>
-                <TenantStaffWorkspace />
-              </ProtectedRoute>
-            } />
-            <Route path="work-items" element={
-              <ProtectedRoute>
-                <TenantStaffWorkspace />
-              </ProtectedRoute>
-            } />
+          {/* Layer 2: SME Leader Routes */}
+          <Route path="/leader" element={
+            <ProtectedRoute allowedRoles={['SME_LEADER']}>
+              <SmeLeaderLayout />
+            </ProtectedRoute>
+          }>
+            <Route path="dashboard" element={<TenantAdminDashboard />} />
+            <Route path="appstore" element={<AppStore />} />
+            <Route path="billing" element={<BillingDashboard />} />
+            <Route path="integrations" element={<IntegrationHub />} />
+            <Route index element={<Navigate to="/leader/dashboard" replace />} />
           </Route>
+
+          {/* Layer 3: Tenant Staff Workspace Routes */}
+          <Route path="/staff" element={
+            <ProtectedRoute allowedRoles={['SME_STAFF', 'FIELD_WORKER', 'SME_LEADER']}>
+              <SmeStaffLayout />
+            </ProtectedRoute>
+          }>
+            <Route path="workspace" element={<TenantStaffWorkspace />} />
+            <Route index element={<Navigate to="/staff/workspace" replace />} />
+          </Route>
+
+          {/* Redirections for backward compatibility */}
+          <Route path="/workspace" element={<Navigate to="/staff/workspace" replace />} />
+          <Route path="/tenant/admin" element={<Navigate to="/leader/dashboard" replace />} />
+          <Route path="/tenant/appstore" element={<Navigate to="/leader/appstore" replace />} />
+          <Route path="/tenant/billing" element={<Navigate to="/leader/billing" replace />} />
+          <Route path="/tenant/integrations" element={<Navigate to="/leader/integrations" replace />} />
+          <Route path="/" element={<Navigate to="/staff/workspace" replace />} />
 
           {/* Layer 4: End User Routes */}
           <Route path="/customer" element={<CustomerPortal />} />
