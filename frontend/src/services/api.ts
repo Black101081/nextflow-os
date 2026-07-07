@@ -23,10 +23,15 @@ export const getHeaders = (auth?: any) => {
   };
   
   const token = localStorage.getItem('nf_access_token');
+  const tenantId = auth?.tenantId || localStorage.getItem('nf_tenant_id');
+
+  if (tenantId) {
+    headers['X-Nextflow-Tenant-ID'] = tenantId;
+  }
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
-  } else if (auth && auth.tenantId) {
-    headers['X-Nextflow-Tenant-ID'] = auth.tenantId;
+  } else if (auth && auth.apiKey) {
     headers['X-Nextflow-API-Key'] = auth.apiKey;
   }
   

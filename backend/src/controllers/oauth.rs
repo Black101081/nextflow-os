@@ -48,6 +48,37 @@ pub async fn oauth_token(
     }
 
     // 2. Kiểm tra Client Credentials
+    // Hỗ trợ PLATFORM_ADMIN cho môi trường test
+    if payload.client_id == "ffffffff-ffff-ffff-ffff-ffffffffffff" {
+        let admin_key = std::env::var("PLATFORM_ADMIN_KEY").unwrap_or_else(|_| "nf_platform_secret_admin_key_2026".to_string());
+        if payload.client_secret != admin_key {
+            let err_body = json!({
+                "error": "invalid_client",
+                "error_description": "client_secret không chính xác cho PLATFORM_ADMIN."
+            });
+            return Err((StatusCode::UNAUTHORIZED, Json(err_body)).into_response());
+        }
+
+        let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "nf_gateway_secret_key_123!".to_string());
+        let exp_duration = Duration::hours(1);
+        let expiration = Utc::now() + exp_duration;
+        
+        let claims = Claims {
+            sub: payload.client_id,
+            tenant_id: Uuid::nil(), // Tenant ID rỗng cho Platform Admin
+            role: "PLATFORM_ADMIN".to_string(),
+            exp: expiration.timestamp(),
+            user_id: None,
+        };
+
+        let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(jwt_secret.as_bytes())).unwrap();
+        return Ok(Json(TokenResponse {
+            access_token: token,
+            token_type: "Bearer".to_string(),
+            expires_in: exp_duration.num_seconds(),
+        }));
+    }
+
     // client_id phải là một Tenant ID (UUID v4) hợp lệ
     let tenant_id = match Uuid::parse_str(&payload.client_id) {
         Ok(uid) => uid,

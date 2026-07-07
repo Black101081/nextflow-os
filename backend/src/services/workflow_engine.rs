@@ -86,7 +86,8 @@ impl ExecutionContext {
 
     /// Nội suy biến: Thay thế `${{ key.path }}` bằng giá trị thực
     pub fn interpolate_string(&self, template: &str) -> String {
-        let re = Regex::new(r"\$\{\{\s*([^}]+)\s*\}\}").unwrap();
+        static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+        let re = RE.get_or_init(|| Regex::new(r"\$\{\{\s*([^}]+)\s*\}\}").unwrap());
         re.replace_all(template, |caps: &regex::Captures| {
             let path = caps.get(1).unwrap().as_str().trim();
             match self.get_value_by_path(path) {

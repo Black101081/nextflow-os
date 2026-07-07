@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
-import type { TemplatePack } from '../services/api';
+
 import { 
   Layers, 
   User, 
@@ -14,7 +14,6 @@ import {
   Sparkles,
   Inbox,
   MapPin,
-  Store,
   Camera,
   DollarSign,
   Wifi,
@@ -24,11 +23,8 @@ import { offlineService } from '../services/offlineSync';
 
 import ExtensionSandboxHost from '../components/ExtensionSandboxHost';
 
-import ProtectedRoute from '../components/ProtectedRoute';
-import BillingDashboard from './BillingDashboard';
 
 
-import { DynamicFormBuilder } from '../components/DynamicFormBuilder';
 
 import { useAuth } from '../contexts/AuthContext';
 
@@ -212,7 +208,7 @@ export default function TenantStaffWorkspace() {
 
   // New capability states
   const [users, setUsers] = useState<any[]>([]);
-  const [dynamicBranches, setDynamicBranches] = useState<any[]>(() => {
+  const [dynamicBranches] = useState<any[]>(() => {
     const saved = localStorage.getItem('nf_dynamic_branches');
     return saved ? JSON.parse(saved) : [
       { id: 'branch_q1', name: 'Chi nhánh Quận 1' },
@@ -224,14 +220,8 @@ export default function TenantStaffWorkspace() {
   const [showNotificationPane, setShowNotificationPane] = useState(false);
 
   // Form states for adding user
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserFirstName, setNewUserFirstName] = useState('');
-  const [newUserLastName, setNewUserLastName] = useState('');
-  const [newUserRole, setNewUserRole] = useState('FIELD_WORKER');
 
   // Form states for adding branch
-  const [newBranchId, setNewBranchId] = useState('');
-  const [newBranchName, setNewBranchName] = useState('');
 
   // Form states cho tạo Task mới
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -250,15 +240,8 @@ export default function TenantStaffWorkspace() {
   const [escalateReason, setEscalateReason] = useState('');
 
   // View navigation: 'dashboard' | 'marketplace' | 'customer' | 'billing' | 'integrations'
-  const [currentView, setCurrentView] = useState<'dashboard' | 'marketplace' | 'customer' | 'billing' | 'integrations' | 'observability'>(() => {
-    if (window.location.pathname.includes('/customer')) {
-      return 'customer';
-    }
-    return window.location.pathname.includes('/marketplace') ? 'marketplace' : 'dashboard';
-  });
   const [showAssignDropdown, setShowAssignDropdown] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('inbox');
-  const [exceptions, setExceptions] = useState<any[]>([]);
   const [activeBranch, setActiveBranch] = useState<string>('all');
   const [newTaskBranch, setNewTaskBranch] = useState<string>('branch_q1');
   const [newTaskOrderValue, setNewTaskOrderValue] = useState<string>('1500000');
@@ -274,8 +257,6 @@ export default function TenantStaffWorkspace() {
   const [aiLoading, setAiLoading] = useState(false);
 
   // Dynamic vertical template packs
-  const [templatePacks, setTemplatePacks] = useState<TemplatePack[]>([]);
-  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
 
   // Offline Sync State
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -325,56 +306,17 @@ export default function TenantStaffWorkspace() {
       flushQueue();
     }
   }, [isOnline, pendingSyncCount, auth]);
-  const [selectedIndustryFilter, setSelectedIndustryFilter] = useState<string>('All');
 
   // Policies state
-  const [policies, setPolicies] = useState<{ sla_minutes_default: number; sla_minutes_high: number; auto_assignment_enabled: boolean; routing_mode: string }>({
-    sla_minutes_default: 60,
-    sla_minutes_high: 30,
-    auto_assignment_enabled: false,
-    routing_mode: 'FIFO',
-  });
 
-  // Webhook integration simulation payload
-  const [webhookPayload, setWebhookPayload] = useState<string>(JSON.stringify({
-    order_id: "SHPF-99827-X",
-    customer_name: "Lê Minh Tuấn",
-    email: "tuan.le@gmail.com",
-    branch_id: "branch_q1",
-    total_amount: 14500000,
-    items: [
-      { name: "Laptop Dell Vostro", quantity: 1, price: 14500000 }
-    ],
-    shipping_address: "182 Nguyễn Thị Minh Khai, Quận 1, TPHCM"
-  }, null, 2));
+
 
   // Customer tracking states
   const [trackingSearchId, setTrackingSearchId] = useState<string>('');
   const [trackingResult, setTrackingResult] = useState<any | null>(null);
 
 
-  // Fetch template packs dynamically
-  useEffect(() => {
-    if (!auth) return;
-    setIsLoadingTemplates(true);
-    apiService.getTemplatePacks()
-      .then(packs => {
-        setTemplatePacks(packs);
-        setIsLoadingTemplates(false);
-      })
-      .catch((err) => {
-        console.error('Failed to load templates:', err);
-        setIsLoadingTemplates(false);
-      });
-  }, [auth]);
 
-  // Fetch policies when authenticated
-  useEffect(() => {
-    if (!auth) return;
-    apiService.getTenantPolicies(auth)
-      .then(data => setPolicies(data))
-      .catch(() => {});
-  }, [auth]);
 
   // Fetch queues từ API khi đăng nhập thành công
   useEffect(() => {
@@ -419,9 +361,7 @@ export default function TenantStaffWorkspace() {
         });
         setWorkItems(filtered);
 
-        // Fetch Exceptions list
-        const exceptionsData = await apiService.getExceptions(auth);
-        setExceptions(exceptionsData.exceptions || []);
+        // Exceptions fetch removed for staff view
 
         // Fetch Users list
         const usersList = await apiService.getTenantUsers(auth);
@@ -539,24 +479,7 @@ export default function TenantStaffWorkspace() {
 
 
 
-  const handleInitializeTemplate = async (templateId: string) => {
-    if (!auth) return;
-    try {
-      triggerNotification('success', 'Đang thiết lập gói mẫu giải pháp...');
-      const res = await apiService.initializeTenantTemplate(auth, templateId, true);
-      triggerNotification('success', res.message || 'Khởi tạo thành công!');
-      const data = await apiService.getQueues(auth);
-      setQueues(data.queues || []);
-      if (data.queues && data.queues.length > 0) {
-        setSelectedQueueId(data.queues[0].id);
-        setRouteTargetQueue(data.queues[0].id);
-      }
-      const policyData = await apiService.getTenantPolicies(auth);
-      setPolicies(policyData);
-    } catch (err: any) {
-      triggerNotification('error', err.message);
-    }
-  };
+  // handleInitializeTemplate removed for staff view
 
   const handleCreateWorkItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -718,314 +641,19 @@ export default function TenantStaffWorkspace() {
 
 
   // Render Dashboard Workspace
-  if (queues.length === 0 && currentView !== 'marketplace') {
+  if (queues.length === 0) {
     return (
-      <div className="app-container" style={{ padding: '24px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
-          <div className="panel" style={{ padding: '40px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
-            <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-              <h2 style={{ fontSize: '26px', marginBottom: '12px', color: 'var(--color-primary)', fontWeight: 700 }}>Chào mừng bạn đến với Nextflow OS</h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '15px', lineHeight: 1.6, maxWidth: '800px', margin: '0 auto' }}>
-                Workspace của doanh nghiệp chưa được khởi tạo cấu hình vận hành. Vui lòng chọn một trong **12 Cụm Ngành Giải pháp Mẫu (Vertical Template Packs)** dưới đây để thiết lập Hàng đợi xử lý và quy tắc SLA tiêu chuẩn.
-              </p>
-            </div>
-
-            {/* Filter Categories */}
-            <div style={{
-              display: 'flex',
-              gap: '8px',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-              marginBottom: '32px',
-              paddingBottom: '16px',
-              borderBottom: '1px solid var(--border-color)'
-            }}>
-              {['All', 'Retail', 'Services', 'Wellness', 'F&B', 'Logistics', 'Education', 'Construction', 'Healthcare', 'Real Estate', 'Manufacturing', 'Automotive'].map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedIndustryFilter(cat)}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: 'var(--radius-full)',
-                    border: '1px solid var(--border-color)',
-                    background: selectedIndustryFilter === cat ? 'var(--color-primary)' : 'rgba(255,255,255,0.02)',
-                    color: selectedIndustryFilter === cat ? '#000' : 'var(--text-muted)',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    boxShadow: selectedIndustryFilter === cat ? '0 0 12px rgba(59, 130, 246, 0.4)' : 'none'
-                  }}
-                >
-                  {cat === 'All' ? 'Tất cả các ngành' : cat}
-                </button>
-              ))}
-            </div>
-
-            {isLoadingTemplates ? (
-              <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
-                <Activity className="spin" size={32} style={{ marginBottom: '16px', color: 'var(--color-primary)' }} />
-                <p>Đang tải danh sách Gói Giải pháp Mẫu...</p>
-              </div>
-            ) : (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-                gap: '24px',
-                textAlign: 'left'
-              }}>
-                {(templatePacks.length > 0 ? templatePacks : [
-                  {
-                    id: 'retail_distribution',
-                    name: 'Retail & Light Distribution (Bán lẻ & Phân phối)',
-                    description: 'Thiết lập tối ưu cho các doanh nghiệp bán lẻ, kho hàng và giao nhận. Bao gồm các hàng đợi Xử lý đơn, Đóng gói kho, Shipper giao hàng và Đối soát.',
-                    industry: 'Retail',
-                    config_metadata: {
-                      queues: [
-                        { id: 'q_order_processing', name: '1. Xử lý Đơn', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 1800 },
-                        { id: 'q_warehouse_pack', name: '2. Đóng gói kho', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 3600 },
-                        { id: 'q_shipper_delivery', name: '3. Shipper Giao', category: 'OPERATIONS', routing: 'ROUND_ROBIN', sla_seconds: 7200 },
-                        { id: 'q_finance_clearance', name: '4. Đối soát COD', category: 'FINANCE', routing: 'FIFO', sla_seconds: 10800 }
-                      ]
-                    }
-                  },
-                  {
-                    id: 'field_maintenance',
-                    name: 'Field Maintenance & Installation (Bảo trì & Lắp đặt)',
-                    description: 'Cấu hình cho các dịch vụ bảo trì kỹ thuật, lắp đặt thiết bị tận nơi. Bao gồm tiếp nhận yêu cầu, kỹ thuật viên thực địa và nghiệm thu khách hàng.',
-                    industry: 'Services',
-                    config_metadata: {
-                      queues: [
-                        { id: 'q_service_request', name: '1. Tiếp nhận Yêu cầu', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 1800 },
-                        { id: 'q_tech_dispatch', name: '2. Kỹ thuật viên', category: 'OPERATIONS', routing: 'CAPACITY_BASED', sla_seconds: 14400 },
-                        { id: 'q_customer_signoff', name: '3. Nghiệm thu', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 7200 },
-                        { id: 'q_billing_clearance', name: '4. Đối soát thanh toán', category: 'FINANCE', routing: 'FIFO', sla_seconds: 7200 }
-                      ]
-                    }
-                  },
-                  {
-                    id: 'spa_wellness',
-                    name: 'Spa & Wellness Booking (Dịch vụ Spa & Làm đẹp)',
-                    description: 'Thiết lập cho các spa, tiệm thẩm mỹ và trung tâm chăm sóc sức khỏe. Gồm đặt lịch, phân phòng & kỹ thuật viên, thực hiện liệu trình và chăm sóc khách hàng.',
-                    industry: 'Wellness',
-                    config_metadata: {
-                      queues: [
-                        { id: 'q_booking_scheduler', name: '1. Đặt lịch Spa', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 900 },
-                        { id: 'q_room_assigner', name: '2. Xếp phòng/KTV', category: 'OPERATIONS', routing: 'CAPACITY_BASED', sla_seconds: 1800 },
-                        { id: 'q_therapy_execution', name: '3. Trị liệu', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 7200 },
-                        { id: 'q_post_service', name: '4. Chăm sóc sau liệu trình', category: 'FINANCE', routing: 'FIFO', sla_seconds: 14400 }
-                      ]
-                    }
-                  },
-                  {
-                    id: 'fb_operations',
-                    name: 'F&B Operations (Nhà hàng & Quán cafe)',
-                    description: 'Quy trình vận hành tối ưu cho ngành ẩm thực và đồ uống. Bao gồm ghi nhận order tại bàn/thu ngân, chế biến bếp, phục vụ bàn và đối soát doanh thu.',
-                    industry: 'F&B',
-                    config_metadata: {
-                      queues: [
-                        { id: 'q_order_taking', name: '1. Tiếp nhận & Thu ngân', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 600 },
-                        { id: 'q_kitchen_prep', name: '2. Chế biến & Bếp', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 1200 },
-                        { id: 'q_table_service', name: '3. Phục vụ bàn', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 600 },
-                        { id: 'q_fb_reconciliation', name: '4. Đối soát doanh thu', category: 'FINANCE', routing: 'FIFO', sla_seconds: 3600 }
-                      ]
-                    }
-                  },
-                  {
-                    id: 'logistics_delivery',
-                    name: 'Logistics & Express Delivery (Vận tải & Giao nhận nhanh)',
-                    description: 'Thiết lập cho các công ty chuyển phát nhanh và kho vận. Tối ưu thu gom đơn hàng bưu cục, phân loại và phân công shipper chặng cuối.',
-                    industry: 'Logistics',
-                    config_metadata: {
-                      queues: [
-                        { id: 'q_pickup_request', name: '1. Tiếp nhận đơn ký gửi', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 1800 },
-                        { id: 'q_hub_sorting', name: '2. Phân loại tại Bưu cục', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 3600 },
-                        { id: 'q_last_mile', name: '3. Giao hàng chặng cuối', category: 'OPERATIONS', routing: 'ROUND_ROBIN', sla_seconds: 7200 },
-                        { id: 'q_cod_reconciliation', name: '4. Đối soát thu hộ COD', category: 'FINANCE', routing: 'FIFO', sla_seconds: 10800 }
-                      ]
-                    }
-                  },
-                  {
-                    id: 'professional_services',
-                    name: 'Professional Services (Dịch vụ Tư vấn & Agency)',
-                    description: 'Quy trình vận hành cho các công ty thiết kế, quảng cáo và tư vấn. Quản lý luồng tiếp nhận lead, thiết kế giải pháp và nghiệm thu dự án.',
-                    industry: 'Services',
-                    config_metadata: {
-                      queues: [
-                        { id: 'q_lead_qualification', name: '1. Đánh giá nhu cầu khách hàng', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 3600 },
-                        { id: 'q_proposal_design', name: '2. Thiết kế giải pháp & Báo giá', category: 'OPERATIONS', routing: 'CAPACITY_BASED', sla_seconds: 14400 },
-                        { id: 'q_project_delivery', name: '3. Triển khai dự án', category: 'OPERATIONS', routing: 'CAPACITY_BASED', sla_seconds: 28800 },
-                        { id: 'q_milestone_billing', name: '4. Nghiệm thu & Xuất hóa đơn', category: 'FINANCE', routing: 'FIFO', sla_seconds: 7200 }
-                      ]
-                    }
-                  },
-                  {
-                    id: 'education_training',
-                    name: 'Education & Training Centers (Trung tâm Giáo dục)',
-                    description: 'Giải pháp cho các trung tâm đào tạo, anh ngữ và dạy nghề. Quản lý tư vấn viên, xếp lớp học, gán giảng viên và nghiệm thu kết quả học tập.',
-                    industry: 'Education',
-                    config_metadata: {
-                      queues: [
-                        { id: 'q_consultation', name: '1. Tư vấn khóa học', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 1800 },
-                        { id: 'q_class_allocation', name: '2. Xếp lớp & Gán giảng viên', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 3600 },
-                        { id: 'q_tuition_fee', name: '3. Đối soát học phí', category: 'FINANCE', routing: 'FIFO', sla_seconds: 7200 },
-                        { id: 'q_course_evaluation', name: '4. Nghiệm thu & Báo cáo chất lượng', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 14400 }
-                      ]
-                    }
-                  },
-                  {
-                    id: 'construction_interior',
-                    name: 'Construction & Interior Contractor (Thi công & Nội thất)',
-                    description: 'Cấu hình cho các đơn vị thầu xây dựng và thiết kế nội thất. Quản lý khảo sát hiện trường, thiết kế 3D, mua sắm vật tư và thi công dự án.',
-                    industry: 'Construction',
-                    config_metadata: {
-                      queues: [
-                        { id: 'q_site_survey', name: '1. Khảo sát hiện trường', category: 'OPERATIONS', routing: 'CAPACITY_BASED', sla_seconds: 7200 },
-                        { id: 'q_3d_modeling', name: '2. Thiết kế bản vẽ 3D', category: 'OPERATIONS', routing: 'CAPACITY_BASED', sla_seconds: 28800 },
-                        { id: 'q_material_procurement', name: '3. Mua sắm vật tư', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 14400 },
-                        { id: 'q_site_execution', name: '4. Thi công & Nghiệm thu', category: 'OPERATIONS', routing: 'CAPACITY_BASED', sla_seconds: 57600 }
-                      ]
-                    }
-                  },
-                  {
-                    id: 'healthcare_clinic',
-                    name: 'Healthcare & Clinic Booking (Phòng khám & Y tế)',
-                    description: 'Thiết lập tối ưu cho phòng khám đa khoa, nha khoa hoặc thẩm mỹ viện. Chuẩn hóa tiếp nhận bệnh nhân, khám lâm sàng, phát thuốc và tái khám.',
-                    industry: 'Healthcare',
-                    config_metadata: {
-                      queues: [
-                        { id: 'q_patient_reception', name: '1. Tiếp nhận bệnh nhân', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 600 },
-                        { id: 'q_clinical_exam', name: '2. Khám lâm sàng', category: 'OPERATIONS', routing: 'CAPACITY_BASED', sla_seconds: 1800 },
-                        { id: 'q_pharmacy_dispense', name: '3. Phát thuốc & Thanh toán', category: 'FINANCE', routing: 'FIFO', sla_seconds: 1200 },
-                        { id: 'q_followup_scheduling', name: '4. Hẹn lịch tái khám', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 3600 }
-                      ]
-                    }
-                  },
-                  {
-                    id: 'real_estate',
-                    name: 'Real Estate Agency & Brokerage (Môi giới Bất động sản)',
-                    description: 'Dành cho các sàn giao dịch bất động sản. Quy trình quản lý từ việc nhận nguồn ký gửi, xác thực thông tin, dẫn khách xem nhà và đối soát hoa hồng.',
-                    industry: 'Real Estate',
-                    config_metadata: {
-                      queues: [
-                        { id: 'q_listing_verification', name: '1. Xác thực nguồn nhà', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 3600 },
-                        { id: 'q_viewing_schedule', name: '2. Lên lịch xem nhà', category: 'OPERATIONS', routing: 'ROUND_ROBIN', sla_seconds: 7200 },
-                        { id: 'q_contract_negotiation', name: '3. Thương lượng & Soạn hợp đồng', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 14400 },
-                        { id: 'q_commission_clearance', name: '4. Đối soát phí môi giới', category: 'FINANCE', routing: 'FIFO', sla_seconds: 14400 }
-                      ]
-                    }
-                  },
-                  {
-                    id: 'manufacturing_sme',
-                    name: 'Manufacturing & Work Order (Sản xuất quy mô vừa/nhỏ)',
-                    description: 'Tối ưu cho xưởng sản xuất cơ khí, may mặc, chế biến gỗ. Quản lý lệnh sản xuất, cấp phát nguyên vật liệu, theo dõi công đoạn lắp ráp và QA.',
-                    industry: 'Manufacturing',
-                    config_metadata: {
-                      queues: [
-                        { id: 'q_work_order_intake', name: '1. Tiếp nhận lệnh sản xuất', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 3600 },
-                        { id: 'q_material_allocation', name: '2. Cấp phát nguyên vật liệu', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 7200 },
-                        { id: 'q_assembly_production', name: '3. Lắp ráp & Sản xuất', category: 'OPERATIONS', routing: 'CAPACITY_BASED', sla_seconds: 28800 },
-                        { id: 'q_quality_assurance', name: '4. Kiểm định chất lượng QA', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 7200 }
-                      ]
-                    }
-                  },
-                  {
-                    id: 'auto_repair',
-                    name: 'Automotive Repair & Garage (Sửa chữa Ô tô & Garage)',
-                    description: 'Quy trình quản lý tiếp nhận xe chẩn đoán lỗi, lập báo giá cho khách duyệt, phân công kỹ thuật viên garage sửa chữa và bàn giao xe thanh toán.',
-                    industry: 'Automotive',
-                    config_metadata: {
-                      queues: [
-                        { id: 'q_vehicle_reception', name: '1. Tiếp nhận xe & Chẩn đoán lỗi', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 1800 },
-                        { id: 'q_quote_approval', name: '2. Báo giá & Khách hàng duyệt', category: 'OPERATIONS', routing: 'FIFO', sla_seconds: 3600 },
-                        { id: 'q_repair_execution', name: '3. Sửa chữa & Thay thế linh kiện', category: 'OPERATIONS', routing: 'CAPACITY_BASED', sla_seconds: 14400 },
-                        { id: 'q_wash_checkout', name: '4. Rửa xe, bàn giao & Thanh toán', category: 'FINANCE', routing: 'FIFO', sla_seconds: 1800 }
-                      ]
-                    }
-                  }
-                ])
-                .filter(tp => selectedIndustryFilter === 'All' || tp.industry === selectedIndustryFilter)
-                .map(tp => (
-                  <div
-                    key={tp.id}
-                    className="panel"
-                    style={{
-                      border: '1px solid var(--border-color)',
-                      background: 'var(--bg-surface-elevated)',
-                      borderRadius: '12px',
-                      padding: '24px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.borderColor = 'var(--color-primary)';
-                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.15)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.borderColor = 'var(--border-color)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                    onClick={() => handleInitializeTemplate(tp.id)}
-                  >
-                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '8px' }}>
-                          <span style={{
-                            background: 'rgba(59, 130, 246, 0.1)',
-                            color: 'var(--color-primary)',
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            textTransform: 'uppercase'
-                          }}>
-                            {tp.industry}
-                          </span>
-                          {tp.id === 'retail_distribution' && (
-                            <span className="badge badge-high" style={{ padding: '3px 8px', fontSize: '10px' }}>Khuyên dùng</span>
-                          )}
-                        </div>
-                        <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#fff', marginBottom: '12px', marginTop: 0, lineHeight: 1.4 }}>{tp.name}</h3>
-                        <p style={{ fontSize: '13px', color: 'var(--text-dim)', marginBottom: '16px', lineHeight: 1.6 }}>{tp.description}</p>
-                      </div>
-
-                      <div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Quy trình hàng đợi (SLA):</span>
-                          {tp.config_metadata?.queues?.map((q: any) => {
-                            const formatSlaVal = (seconds: number) => {
-                              if (seconds < 60) return `${seconds}s`;
-                              const minutes = Math.round(seconds / 60);
-                              if (minutes < 60) return `${minutes}m`;
-                              const hours = Math.round(minutes / 60);
-                              return `${hours}h`;
-                            };
-                            return (
-                              <div key={q.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-dim)' }}>
-                                <span>{q.name}</span>
-                                <span style={{ color: 'var(--color-secondary)', fontWeight: 600 }}>{formatSlaVal(q.sla_seconds)}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <button className="btn btn-secondary" style={{ width: '100%', padding: '10px', fontWeight: 600 }}>Khởi chạy giải pháp</button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+      <div className="app-container" style={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center', background: 'var(--bg-color)', padding: '24px' }}>
+        <div className="panel" style={{ padding: '40px', background: 'var(--surface-color)', border: '1px solid var(--border-color)', borderRadius: '12px', textAlign: 'center', maxWidth: '600px' }}>
+          <div style={{ color: 'var(--text-dim)', marginBottom: '16px', fontSize: '48px' }}>⚡</div>
+          <h2 style={{ fontSize: '22px', marginBottom: '12px', fontWeight: 700, color: '#fff' }}>Workspace Chưa Được Thiết Lập</h2>
+          <p style={{ color: 'var(--text-dim)', fontSize: '14px', lineHeight: 1.6 }}>
+            Doanh nghiệp của bạn chưa cấu hình quy trình làm việc (Hàng đợi, SLA, v.v.). Vui lòng liên hệ Quản trị viên (SME Leader) để tiến hành thiết lập hệ thống từ trang quản trị.
+          </p>
         </div>
       </div>
     );
   }
-
   // Render Dashboard Workspace
   return (
     <div className="app-container">
@@ -1380,51 +1008,9 @@ export default function TenantStaffWorkspace() {
             )}
           </div>
 
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <button
-              onClick={() => setCurrentView('observability')}
-              className={`sidebar-item ${(currentView as string) === 'observability' ? 'active' : ''}`}
-              style={{ width: '100%', justifyContent: 'flex-start', gap: '8px' }}
-            >
-              <Activity size={16} /> Giám sát & Báo cáo
-            </button>
-            <button
-              onClick={() => setCurrentView('integrations')}
-              className={`sidebar-item ${(currentView as string) === 'integrations' ? 'active' : ''}`}
-              style={{ width: '100%', justifyContent: 'flex-start', gap: '8px' }}
-            >
-              🔌 Webhooks & Tích hợp
-            </button>
-            <button
-              data-testid="nav-marketplace"
-              onClick={() => setCurrentView(v => v === 'marketplace' ? 'dashboard' : 'marketplace')}
-              className={`sidebar-item ${currentView === 'marketplace' ? 'active' : ''}`}
-              style={{ width: '100%', justifyContent: 'flex-start', gap: '8px' }}
-            >
-              <Store size={15} /> Marketplace
-            </button>
-            <ProtectedRoute allowedRoles={['SME_LEADER', 'SME_OPS']}>
-              <button
-                onClick={() => setCurrentView(v => v === 'billing' ? 'dashboard' : 'billing')}
-                className={`sidebar-item ${currentView === 'billing' ? 'active' : ''}`}
-                style={{ width: '100%', justifyContent: 'flex-start', gap: '8px', marginTop: '4px' }}
-              >
-                <DollarSign size={15} /> Quản lý Tài chính (Billing)
-              </button>
-            </ProtectedRoute>
-          </div>
         </div>
 
-        {/* Center Panel: Work Items Inbox OR Marketplace OR Billing */}
-        {currentView === 'marketplace' ? (
-          <div className="panel" style={{ gridColumn: 'span 2' }}>
-            {/* MarketplaceAdmin removed */}
-          </div>
-        ) : currentView === 'billing' && auth ? (
-          <div className="panel" style={{ gridColumn: 'span 2' }}>
-            <BillingDashboard />
-          </div>
-        ) : (<>
+        {/* Center Panel: Work Items Inbox */}
         <div className="panel" style={{ gap: '20px' }}>
           {/* Tabs Navigation */}
           <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', flexWrap: 'wrap' }}>
@@ -1436,91 +1022,22 @@ export default function TenantStaffWorkspace() {
               📥 Inbox ({workItems.length})
             </button>
             <button 
-              onClick={() => setActiveTab('control_center')} 
-              className={`btn ${activeTab === 'control_center' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab('ai_assistant')} 
+              className={`btn ${activeTab === 'ai_assistant' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ padding: '6px 10px', fontSize: '12px', flex: '1 0 auto' }}
             >
-              📊 Control
-            </button>
-            <button 
-              onClick={() => setActiveTab('branch_overview')} 
-              className={`btn ${activeTab === 'branch_overview' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '6px 10px', fontSize: '12px', flex: '1 0 auto' }}
-            >
-              🏢 Chi nhánh
-            </button>
-            <button 
-              onClick={() => setActiveTab('exceptions')} 
-              className={`btn ${activeTab === 'exceptions' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '6px 10px', fontSize: '12px', flex: '1 0 auto' }}
-            >
-              ⚠️ Phê duyệt ({exceptions.filter(e => e.status === 'PENDING').length})
+              🤖 Trợ lý SOP AI
             </button>
             <button 
               onClick={() => setActiveTab('customer_tracking')} 
               className={`btn ${activeTab === 'customer_tracking' ? 'btn-primary' : 'btn-secondary'}`}
               style={{ padding: '6px 10px', fontSize: '12px', flex: '1 0 auto' }}
             >
-              🔍 Tra cứu KH
+              🔍 Tra cứu đơn
             </button>
-            {activeRole === 'SME_LEADER' && (
-              <>
-                <button 
-                  onClick={() => setActiveTab('policies')} 
-                  className={`btn ${activeTab === 'policies' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '6px 10px', fontSize: '12px', flex: '1 0 auto' }}
-                >
-                  ⚙️ Policies
-                </button>
-                <button 
-                  onClick={() => setActiveTab('integrations')} 
-                  className={`btn ${activeTab === 'integrations' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '6px 10px', fontSize: '12px', flex: '1 0 auto' }}
-                >
-                  🔗 Webhooks/CSV
-                </button>
-                <button 
-                  onClick={() => setActiveTab('team_management')} 
-                  className={`btn ${activeTab === 'team_management' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '6px 10px', fontSize: '12px', flex: '1 0 auto' }}
-                >
-                  👥 Nhân sự ({users.length})
-                </button>
-                <button 
-                  onClick={() => setActiveTab('nocode_builder')} 
-                  className={`btn ${activeTab === 'nocode_builder' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '6px 10px', fontSize: '12px', flex: '1 0 auto', background: activeTab === 'nocode_builder' ? '#3b82f6' : '#1e293b', border: '1px solid #3b82f6' }}
-                >
-                  ✨ No-Code Builder
-                </button>
-              </>
-            )}
           </div>
 
-          {activeTab === 'nocode_builder' && (
-            <div className="panel" style={{ padding: '20px' }}>
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-white mb-2">Trình Tạo Giao Diện Tự Động (Schema-Driven UI)</h2>
-                <p className="text-slate-400">Ví dụ này minh họa cách một file cấu hình JSON được gửi từ Backend tự động "biến hình" thành một giao diện ứng dụng hoàn chỉnh cho SME. 
-                Bạn không cần sửa code React mỗi khi SME muốn thêm một trường dữ liệu mới vào hệ thống.</p>
-              </div>
-              <DynamicFormBuilder 
-                schema={{
-                  title: "Tạo Hồ Sơ Khám Bệnh (Template Nha Khoa)",
-                  type: "object",
-                  required: ["patient_name", "blood_pressure"],
-                  properties: {
-                    patient_name: { type: "string", title: "Tên Bệnh Nhân", description: "Vui lòng nhập họ và tên đầy đủ" },
-                    age: { type: "number", title: "Tuổi" },
-                    blood_pressure: { type: "string", title: "Chỉ số Huyết Áp (mmHg)" }
-                  }
-                }}
-                onSubmit={(data) => alert("Dữ liệu chuẩn bị được nạp vào Entity Records và chạy qua Workflow Engine:\\n" + JSON.stringify(data, null, 2))}
-              />
-            </div>
-          )}
-
-          {activeTab === 'inbox' && (
+                    {activeTab === 'inbox' && (
             <>
               <div className="panel-header" style={{ padding: 0 }}>
                 <h3 className="panel-title"><Inbox size={18} color="var(--color-primary)" /> Hộp thư nhiệm vụ (Task Inbox)</h3>
@@ -1652,593 +1169,107 @@ export default function TenantStaffWorkspace() {
               </div>
             </>
           )}
-
-          {activeTab === 'control_center' && (
+          {activeTab === 'ai_assistant' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <h3 className="panel-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
-                📊 Operational Control Dashboard & AI SOP Assistant
+              <h3 className="panel-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', margin: 0 }}>
+                🤖 Trợ lý Quy trình AI (SOP Assistant)
               </h3>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px', alignItems: 'start' }}>
-                {/* Column 1: Metrics & SLA alerts */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div className="stats-container" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                    <div className="stat-card" style={{ borderLeft: '4px solid var(--color-secondary)' }}>
-                      <div className="stat-num" style={{ color: 'var(--color-secondary)' }}>90.9%</div>
-                      <div className="stat-label">SLA Compliance Rate (Target: &gt;90%)</div>
-                    </div>
-                    <div className="stat-card" style={{ borderLeft: '4px solid var(--color-info)' }}>
-                      <div className="stat-num" style={{ color: 'var(--color-info)' }}>18.4 /h</div>
-                      <div className="stat-label">Throughput Tốc độ Xử lý</div>
-                    </div>
-                    <div className="stat-card" style={{ borderLeft: '4px solid var(--color-warning)' }}>
-                      <div className="stat-num" style={{ color: 'var(--color-warning)' }}>{exceptions.filter(e => e.status === 'PENDING').length}</div>
-                      <div className="stat-label">Ngoại lệ PENDING Chờ duyệt</div>
-                    </div>
-                  </div>
+              <div style={{ background: 'var(--bg-surface-elevated)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <p style={{ fontSize: '12px', color: 'var(--text-dim)', margin: 0, lineHeight: 1.4 }}>
+                  Hỏi đáp về quy trình vận hành, chính sách xử lý đơn hàng của doanh nghiệp dựa trên bộ tài liệu SOP được cấu hình sẵn.
+                </p>
 
-                  {/* SLA Risk Distribution */}
-                  <div style={{ background: 'var(--bg-surface-elevated)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                    <h4 style={{ color: '#fff', fontSize: '14px', marginBottom: '12px', fontWeight: 600 }}>SLA Risk Distribution (Phân bổ mức độ trễ hạn)</h4>
-                    <div style={{ display: 'flex', gap: '4px', height: '24px', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ width: '15%', backgroundColor: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#fff', fontWeight: 700 }}>
-                        15% High
-                      </div>
-                      <div style={{ width: '30%', backgroundColor: 'var(--color-warning)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#000', fontWeight: 700 }}>
-                        30% Med
-                      </div>
-                      <div style={{ width: '55%', backgroundColor: 'var(--color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#fff', fontWeight: 700 }}>
-                        55% Low
-                      </div>
-                    </div>
-                    <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '8px' }}>
-                      💡 <strong>Gợi ý AI:</strong> Hiện trạng có tác vụ độ ưu tiên HIGH đang ở tình trạng sắp vi phạm SLA. Bạn nên chuyển tiếp tác vụ này hoặc click Duyệt Ngoại lệ.
-                    </p>
-                  </div>
-
-                  {/* SLA Risk items */}
-                  <div style={{ background: 'var(--bg-surface-elevated)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                    <h4 style={{ color: '#fff', fontSize: '14px', marginBottom: '12px', fontWeight: 600 }}>Cảnh báo Trễ hạn (SLA High Risk Items)</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {workItems.filter(item => item.priority === 'HIGH' || item.priority === 'CRITICAL').map(item => (
-                        <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px' }}>
-                          <div>
-                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>{item.title}</div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>Hàng đợi: {queues.find(q => q.id === item.queue_id)?.name || item.queue_id}</div>
-                          </div>
-                          <span className="badge badge-high">Rủi ro: 85%</span>
-                        </div>
-                      ))}
-                      {workItems.filter(item => item.priority === 'HIGH' || item.priority === 'CRITICAL').length === 0 && (
-                        <div style={{ fontSize: '12px', color: 'var(--text-dim)', textAlign: 'center', padding: '10px' }}>
-                          🎉 Tuyệt vời! Không có tác vụ nào gặp rủi ro SLA cao tại hàng đợi này.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Column 2: AI SOP RAG Assistant */}
-                <div style={{ background: 'var(--bg-surface-elevated)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <h4 style={{ color: '#fff', fontSize: '15px', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Sparkles size={16} color="var(--color-primary)" /> Trợ lý Quy trình AI (SOP Assistant)
-                  </h4>
-                  <p style={{ fontSize: '11px', color: 'var(--text-dim)', margin: 0, lineHeight: 1.4 }}>
-                    Hỏi đáp về quy trình vận hành, chính sách xử lý đơn hàng của doanh nghiệp dựa trên bộ tài liệu SOP được cấu hình sẵn.
-                  </p>
-
-                  {/* Suggest queries */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                    {[
-                      "SLA là gì?",
-                      "Nextflow OS là gì và mục tiêu của hệ thống?",
-                      "Operator có nhiệm vụ gì trong hệ thống?",
-                      "Work item là gì?"
-                    ].map(qText => (
-                      <button
-                        key={qText}
-                        type="button"
-                        onClick={() => {
-                          setAiQuery(qText);
-                          handleQueryRag(qText);
-                        }}
-                        style={{
-                          fontSize: '11px',
-                          background: 'rgba(255,255,255,0.02)',
-                          border: '1px solid rgba(255,255,255,0.06)',
-                          borderRadius: '6px',
-                          padding: '8px 10px',
-                          color: '#e2e8f0',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          display: 'block',
-                          width: '100%',
-                          transition: 'background 0.2s'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'}
-                      >
-                        💡 {qText}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Input Form */}
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                    <input
-                      type="text"
-                      placeholder="Nhập câu hỏi quy trình..."
-                      className="form-input"
-                      style={{ fontSize: '12px', flex: 1 }}
-                      value={aiQuery}
-                      onChange={(e) => setAiQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && aiQuery.trim().length >= 5) handleQueryRag();
-                      }}
-                    />
+                {/* Suggest queries */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                  {[
+                    "SLA là gì?",
+                    "Nextflow OS là gì và mục tiêu của hệ thống?",
+                    "Operator có nhiệm vụ gì trong hệ thống?",
+                    "Work item là gì?"
+                  ].map(qText => (
                     <button
-                      onClick={() => handleQueryRag()}
-                      className="btn btn-primary"
-                      disabled={aiLoading || aiQuery.trim().length < 5}
-                      style={{ padding: '0 16px', fontSize: '12px', flexShrink: 0, height: '36px' }}
+                      key={qText}
+                      type="button"
+                      onClick={() => {
+                        setAiQuery(qText);
+                        handleQueryRag(qText);
+                      }}
+                      style={{
+                        fontSize: '11px',
+                        background: 'rgba(255,255,255,0.02)',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        borderRadius: '6px',
+                        padding: '8px 10px',
+                        color: '#e2e8f0',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        display: 'block',
+                        width: '100%',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)'}
                     >
-                      {aiLoading ? '...' : 'Hỏi'}
+                      💡 {qText}
                     </button>
-                  </div>
-
-                  {/* Answer Box */}
-                  {aiAnswer && (
-                    <div style={{
-                      background: 'rgba(15, 23, 42, 0.4)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      padding: '12px',
-                      fontSize: '12px',
-                      lineHeight: '1.5',
-                      marginTop: '8px'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '6px', marginBottom: '8px' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Sparkles size={12} /> Trợ lý AI trả lời:
-                        </span>
-                        <span style={{ fontSize: '10px', color: 'var(--color-secondary)' }}>Độ tin cậy: {(aiScore * 100).toFixed(0)}%</span>
-                      </div>
-                      <div style={{ color: '#e2e8f0', whiteSpace: 'pre-line' }}>{aiAnswer}</div>
-                      {aiSource && (
-                        <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '10px', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '6px' }}>
-                          📄 Nguồn tham chiếu: <strong>{aiSource}</strong>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  ))}
                 </div>
-              </div>
-            </div>
-          )}
 
-          {activeTab === 'branch_overview' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <h3 className="panel-title">🏢 Giám sát Hoạt động Chi nhánh (Branch Visibility)</h3>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button onClick={() => setActiveBranch('all')} className={`btn ${activeBranch === 'all' ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '4px 10px', fontSize: '11px' }}>
-                    Tất cả
+                {/* Input Form */}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  <input
+                    type="text"
+                    placeholder="Nhập câu hỏi quy trình..."
+                    className="form-input"
+                    style={{ fontSize: '12px', flex: 1 }}
+                    value={aiQuery}
+                    onChange={(e) => setAiQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && aiQuery.trim().length >= 5) handleQueryRag();
+                    }}
+                  />
+                  <button
+                    onClick={() => handleQueryRag()}
+                    className="btn btn-primary"
+                    disabled={aiLoading || aiQuery.trim().length < 5}
+                    style={{ padding: '0 16px', fontSize: '12px', flexShrink: 0, height: '36px' }}
+                  >
+                    {aiLoading ? '...' : 'Hỏi'}
                   </button>
-                  {dynamicBranches.map(b => (
-                    <button key={b.id} onClick={() => setActiveBranch(b.id)} className={`btn ${activeBranch === b.id ? 'btn-primary' : 'btn-secondary'}`} style={{ padding: '4px 10px', fontSize: '11px' }}>
-                      {b.name}
-                    </button>
-                  ))}
                 </div>
-              </div>
 
-              {/* Branch Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
-                {dynamicBranches.map(b => (
-                  <div key={b.id} style={{ background: 'var(--bg-surface-elevated)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                    <h4 style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>{b.name}</h4>
-                    <div style={{ fontSize: '28px', color: 'var(--color-primary)', fontWeight: 700, margin: '8px 0' }}>
-                      {workItems.filter(item => item.metadata?.branch_id === b.id).length}
+                {/* Answer Box */}
+                {aiAnswer && (
+                  <div style={{
+                    background: 'rgba(15, 23, 42, 0.4)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    fontSize: '12px',
+                    lineHeight: '1.5',
+                    marginTop: '8px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '6px', marginBottom: '8px' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Sparkles size={12} /> Trợ lý AI trả lời:
+                      </span>
+                      <span style={{ fontSize: '10px', color: 'var(--color-secondary)' }}>Độ tin cậy: {(aiScore * 100).toFixed(0)}%</span>
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Backlog đơn hàng</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Branch Comparison Table */}
-              <div style={{ background: 'var(--bg-surface-elevated)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                <h4 style={{ color: '#fff', fontSize: '14px', fontWeight: 600, marginBottom: '16px' }}>📊 Phân tích & So sánh Hiệu năng Chi nhánh</h4>
-                
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
-                        <th style={{ padding: '12px 8px' }}>TÊN CHI NHÁNH</th>
-                        <th style={{ padding: '12px 8px' }}>BACKLOG HOẠT ĐỘNG</th>
-                        <th style={{ padding: '12px 8px' }}>TỈ LỆ ĐẠT SLA</th>
-                        <th style={{ padding: '12px 8px' }}>TỔNG GIÁ TRỊ ĐƠN HÀNG</th>
-                        <th style={{ padding: '12px 8px' }}>NHÂN SỰ VẬN HÀNH</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dynamicBranches.map(b => {
-                        const backlog = workItems.filter(item => item.metadata?.branch_id === b.id && item.status !== 'COMPLETED' && item.status !== 'CANCELLED').length;
-                        const totalValue = workItems.filter(item => item.metadata?.branch_id === b.id).reduce((sum, item) => sum + (parseFloat(item.metadata?.order_value) || 0), 0);
-                        const slaRate = b.id === 'branch_q1' ? '94.5%' : b.id === 'branch_q3' ? '88.2%' : '91.8%';
-                        const staffCount = b.id === 'branch_q1' ? 4 : b.id === 'branch_q3' ? 2 : 5;
-                        
-                        return (
-                          <tr key={b.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', color: '#e2e8f0' }}>
-                            <td style={{ padding: '12px 8px', fontWeight: 600 }}>🏢 {b.name}</td>
-                            <td style={{ padding: '12px 8px' }}>
-                              <span style={{ 
-                                padding: '3px 8px', 
-                                borderRadius: '12px', 
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                background: backlog > 3 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
-                                color: backlog > 3 ? '#ef4444' : '#10b981'
-                              }}>{backlog} đơn</span>
-                            </td>
-                            <td style={{ padding: '12px 8px', color: '#10b981', fontWeight: 'bold' }}>{slaRate}</td>
-                            <td style={{ padding: '12px 8px', fontWeight: '600' }}>{totalValue.toLocaleString()} VNĐ</td>
-                            <td style={{ padding: '12px 8px', color: 'var(--text-muted)' }}>👤 {staffCount} operators</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Branch Tasks List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <h4 style={{ color: '#fff', fontSize: '13px', fontWeight: 600 }}>Danh sách đơn hàng của Chi nhánh</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '240px' }}>
-                  {workItems.filter(item => activeBranch === 'all' || item.metadata?.branch_id === activeBranch).map(item => (
-                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', backgroundColor: 'var(--bg-surface-elevated)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-                      <div>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>{item.title}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>
-                          KH: {item.metadata?.customer_name || 'N/A'} | Đơn giá: {item.metadata?.order_value?.toLocaleString() || 0}đ
-                        </div>
+                    <div style={{ color: '#e2e8f0', whiteSpace: 'pre-line' }}>{aiAnswer}</div>
+                    {aiSource && (
+                      <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '10px', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '6px' }}>
+                        📄 Nguồn tham chiếu: <strong>{aiSource}</strong>
                       </div>
-                      <span className={`badge ${item.status === 'UNASSIGNED' ? 'badge-unassigned' : 'badge-progress'}`}>{item.status}</span>
-                    </div>
-                  ))}
-                  {workItems.filter(item => activeBranch === 'all' || item.metadata?.branch_id === activeBranch).length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-dim)', fontSize: '12px' }}>
-                      Không có đơn hàng nào tại chi nhánh này.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'exceptions' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <h3 className="panel-title">⚠️ Phê duyệt Ngoại lệ Vận hành (Escalated Exceptions Panel)</h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
-                Khi nhân viên giao hàng (Shipper) hoặc đội tác nghiệp gặp sự cố ngoài chuẩn (đơn trễ hạn, sai địa chỉ, khách hoàn trả), họ sẽ thực hiện "Leo thang". Yêu cầu đó hiển thị dưới đây để Manager duyệt hoặc bác bỏ.
-              </p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', maxHeight: '420px' }}>
-                {exceptions.map(ex => {
-                  const handleResolve = async (decision: 'APPROVED' | 'REJECTED') => {
-                    if (!auth) return;
-                    try {
-                      await apiService.resolveException(auth, ex.id, decision);
-                      triggerNotification('success', `Đã ${decision === 'APPROVED' ? 'Duyệt' : 'Từ chối'} ngoại lệ thành công!`);
-                      const excData = await apiService.getExceptions(auth);
-                      setExceptions(excData.exceptions || []);
-                    } catch (err: any) {
-                      triggerNotification('error', err.message);
-                    }
-                  };
-
-                  return (
-                    <div key={ex.id} style={{ background: 'var(--bg-surface-elevated)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span className="badge badge-high" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                          {ex.exception_type}
-                        </span>
-                        <span className={`badge ${ex.status === 'PENDING' ? 'badge-unassigned' : ex.status === 'APPROVED' ? 'badge-completed' : 'badge-high'}`}>
-                          {ex.status}
-                        </span>
-                      </div>
-                      
-                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#fff' }}>
-                        Nhiệm vụ: {ex.work_item_title || ex.work_item_id.substring(0, 8)}
-                      </div>
-
-                      <div style={{ fontSize: '12px', color: 'var(--text-main)', background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                        <strong>Lý do leo thang:</strong> {ex.reason}
-                      </div>
-
-                      <div style={{ fontSize: '10px', color: 'var(--text-dim)' }}>
-                        Yêu cầu lúc: {new Date(ex.created_at).toLocaleString()}
-                      </div>
-
-                      {ex.status === 'PENDING' && (
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
-                          <button 
-                            onClick={() => handleResolve('APPROVED')} 
-                            className="btn btn-secondary" 
-                            style={{ flex: 1, borderColor: 'var(--color-secondary)', color: 'var(--color-secondary)', padding: '6px' }}
-                          >
-                            ✓ Duyệt (Chạy tiếp)
-                          </button>
-                          <button 
-                            onClick={() => handleResolve('REJECTED')} 
-                            className="btn btn-accent" 
-                            style={{ flex: 1, padding: '6px' }}
-                          >
-                            ✗ Từ chối (Hủy đơn)
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {exceptions.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>
-                    <CheckCircle size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-                    <p>Không có ngoại lệ nào cần xử lý.</p>
+                    )}
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {activeTab === 'policies' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <h3 className="panel-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', margin: 0 }}>
-                ⚙️ Chính sách & Quy tắc vận hành (SLA Policies)
-              </h3>
-              
-              <div style={{ background: 'var(--bg-surface-elevated)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="form-group">
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>THỜI HẠN SLA MẶC ĐỊNH (PHÚT)</label>
-                    <input 
-                      type="number" 
-                      className="form-input" 
-                      value={policies.sla_minutes_default} 
-                      onChange={(e) => setPolicies({ ...policies, sla_minutes_default: parseInt(e.target.value) || 60 })} 
-                    />
-                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block', marginTop: '4px' }}>Áp dụng cho các nhiệm vụ độ ưu tiên MEDIUM & LOW</span>
-                  </div>
 
-                  <div className="form-group">
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>THỜI HẠN SLA KHẨN CẤP (PHÚT)</label>
-                    <input 
-                      type="number" 
-                      className="form-input" 
-                      value={policies.sla_minutes_high} 
-                      onChange={(e) => setPolicies({ ...policies, sla_minutes_high: parseInt(e.target.value) || 30 })} 
-                    />
-                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'block', marginTop: '4px' }}>Áp dụng cho các nhiệm vụ độ ưu tiên HIGH & CRITICAL</span>
-                  </div>
-                </div>
-
-                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <input 
-                    type="checkbox" 
-                    id="auto_assign_toggle"
-                    checked={policies.auto_assignment_enabled} 
-                    onChange={(e) => setPolicies({ ...policies, auto_assignment_enabled: e.target.checked })} 
-                    style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                  />
-                  <label htmlFor="auto_assign_toggle" style={{ cursor: 'pointer', margin: 0, color: '#fff' }}>
-                    <strong>Tự động phân phối công việc (AI Auto-Assignment)</strong>
-                    <div style={{ fontSize: '12px', color: 'var(--text-dim)', fontWeight: 'normal', marginTop: '2px' }}>AI tự động tính toán hiệu năng và gán task cho Operator phù hợp nhất.</div>
-                  </label>
-                </div>
-
-                <div className="form-group">
-                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>THUẬT TOÁN ĐỊNH TUYẾN (ROUTING ALGORITHM)</label>
-                  <select 
-                    className="form-input" 
-                    value={policies.routing_mode} 
-                    onChange={(e) => setPolicies({ ...policies, routing_mode: e.target.value })}
-                  >
-                    <option value="FIFO">FIFO (First In First Out - Đến trước xử lý trước)</option>
-                    <option value="ROUND_ROBIN">Round Robin (Chia đều xoay vòng)</option>
-                    <option value="AI_RECOMMENDED">AI Smart Routing (Gợi ý phân bổ tối ưu)</option>
-                  </select>
-                </div>
-
-                <button 
-                  onClick={async () => {
-                    if (!auth) return;
-                    try {
-                      await apiService.updateTenantPolicies(auth, policies);
-                      triggerNotification('success', 'Đã lưu cấu hình SLA & Routing thành công!');
-                    } catch (err: any) {
-                      triggerNotification('error', err.message);
-                    }
-                  }} 
-                  className="btn btn-primary" 
-                  style={{ alignSelf: 'flex-start', padding: '10px 24px' }}
-                >
-                  Lưu cấu hình chính sách
-                </button>
-
-                <div style={{ borderTop: '1px dashed var(--border-color)', marginTop: '24px', paddingTop: '20px' }}>
-                  <h4 style={{ color: '#fff', fontSize: '14px', fontWeight: 600, marginBottom: '8px' }}>
-                    📦 Khởi tạo Gói Giải pháp mẫu theo Ngành (Vertical Templates)
-                  </h4>
-                  <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '16px' }}>
-                    Lựa chọn ngành nghề của bạn để hệ thống tự động cấu hình các Hàng đợi xử lý (Queues) và quy tắc SLA mặc định chuẩn công nghiệp.
-                  </p>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
-                    {[
-                      { id: 'retail_logistics', name: 'Logistics Bán lẻ (Retail)', desc: 'Cấu hình luồng Tiếp nhận, Vận chuyển, Đối soát dòng tiền và Hàng trả lại.' },
-                      { id: 'automotive_repair', name: 'Garage Ô tô (Automotive)', desc: 'Quy trình Tiếp nhận chẩn đoán, Báo giá khách hàng, Sửa chữa máy/đồng sơn và Bàn giao xe.' },
-                      { id: 'real_estate', name: 'Môi giới BĐS (Real Estate)', desc: 'Quy trình Thẩm định bất động sản, Dẫn khách xem nhà, Ký cọc và Hồ sơ pháp lý.' }
-                    ].map(tpl => (
-                      <div key={tpl.id} style={{
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '8px',
-                        padding: '16px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        gap: '12px'
-                      }}>
-                        <div>
-                          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)' }}>{tpl.name}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px', lineHeight: 1.4 }}>{tpl.desc}</div>
-                        </div>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          style={{ fontSize: '11px', padding: '6px 12px', width: '100%', justifyContent: 'center' }}
-                          onClick={async () => {
-                            if (!auth) return;
-                            if (!window.confirm(`Bạn có chắc chắn muốn khởi tạo gói mẫu "${tpl.name}"? Hành động này sẽ thay thế cấu hình hàng đợi hiện tại.`)) return;
-                            try {
-                              triggerNotification('success', `Đang cấu hình gói giải pháp ${tpl.name}...`);
-                              await apiService.initializeTenantTemplate(auth, tpl.id, true);
-                              triggerNotification('success', `Đã cấu hình thành công Gói giải pháp ${tpl.name}!`);
-                              // Refresh queues
-                              const queuesData = await apiService.getQueues(auth);
-                              setQueues(queuesData.queues || []);
-                              if (queuesData.queues && queuesData.queues.length > 0) {
-                                setSelectedQueueId(queuesData.queues[0].id);
-                              }
-                            } catch (err: any) {
-                              triggerNotification('error', err.message);
-                            }
-                          }}
-                        >
-                          Kích hoạt Gói này
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'integrations' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <h3 className="panel-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', margin: 0 }}>
-                🔗 Cổng Tích hợp & Webhooks (Shopify / CSV Ingestion)
-              </h3>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {/* Shopify Webhook Simulator */}
-                <div style={{ background: 'var(--bg-surface-elevated)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                  <h4 style={{ color: '#fff', fontSize: '15px', fontWeight: 600, margin: '0 0 8px 0' }}>Shopify Order Ingestion Simulator</h4>
-                  <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '16px' }}>
-                    Mô phỏng sự kiện `order/create` gửi từ Shopify Webhook để đưa đơn hàng tự động vào Queue xử lý của Nextflow OS.
-                  </p>
-
-                  <div className="form-group">
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>MOCK WEBHOOK PAYLOAD (JSON)</label>
-                    <textarea 
-                      className="form-input" 
-                      style={{ fontFamily: 'monospace', fontSize: '12px', height: '150px', background: '#000', color: '#10B981', border: '1px solid var(--border-color)', padding: '10px', width: '100%' }}
-                      value={webhookPayload}
-                      onChange={(e) => setWebhookPayload(e.target.value)}
-                    />
-                  </div>
-
-                  <button 
-                    onClick={async () => {
-                      if (!auth) return;
-                      try {
-                        const parsed = JSON.parse(webhookPayload);
-                        const payload = {
-                          title: `Xử lý đơn hàng Shopify #${parsed.order_id}`,
-                          description: `Giao hàng đến: ${parsed.shipping_address}`,
-                          priority: parsed.total_amount > 10000000 ? 'HIGH' : 'MEDIUM',
-                          category: 'OPERATIONS',
-                          source: 'SHOPIFY_WEBHOOK',
-                          external_id: parsed.order_id,
-                          metadata: {
-                            branch_id: parsed.branch_id || 'branch_q1',
-                            customer_name: parsed.customer_name,
-                            order_value: parsed.total_amount,
-                            email: parsed.email
-                          }
-                        };
-                        const created = await apiService.createWorkItem(auth, payload as any);
-                        setWorkItems(prev => [created, ...prev]);
-                        triggerNotification('success', `Đã nhận đơn hàng từ Shopify Webhook! ID: ${created.id}`);
-                      } catch (err: any) {
-                        triggerNotification('error', 'Payload JSON không hợp lệ hoặc lỗi kết nối: ' + err.message);
-                      }
-                    }} 
-                    className="btn btn-primary"
-                    style={{ marginTop: '12px' }}
-                  >
-                    Gửi simulated webhook
-                  </button>
-                </div>
-
-                {/* CSV Ingestion */}
-                <div style={{ background: 'var(--bg-surface-elevated)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <h4 style={{ color: '#fff', fontSize: '15px', fontWeight: 600, margin: 0 }}>Nhập File Đơn hàng (CSV Bulk Import)</h4>
-                  <p style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
-                    Tải lên danh sách đơn hàng loạt để phân phối nhanh vào các chi nhánh tương ứng.
-                  </p>
-
-                  <button 
-                    onClick={async () => {
-                      if (!auth) return;
-                      try {
-                        triggerNotification('success', 'Đang tải lên dữ liệu CSV giả lập...');
-                        const mockCSVRows = [
-                          { title: "Đơn hàng nội thành Hà Nội #8827", name: "Trịnh Khắc Huy", val: 1250000, branch: "branch_q1" },
-                          { title: "Đơn hàng linh kiện PC Biên Hòa #8828", name: "Nguyễn Minh Đức", val: 19800000, branch: "branch_warehouse" },
-                          { title: "Đơn hàng thời trang Q.3 #8829", name: "Vũ Phương Ly", val: 680000, branch: "branch_q3" }
-                        ];
-
-                        for (const row of mockCSVRows) {
-                          await apiService.createWorkItem(auth, {
-                            title: row.title,
-                            priority: row.val > 10000000 ? 'HIGH' : 'MEDIUM',
-                            category: 'OPERATIONS',
-                            source: 'CSV_IMPORT',
-                            metadata: {
-                              branch_id: row.branch,
-                              customer_name: row.name,
-                              order_value: row.val
-                            } as any
-                          });
-                        }
-                        
-                        triggerNotification('success', 'Đã import thành công 3 đơn hàng từ file CSV!');
-                        const items = await apiService.getWorkItems(auth);
-                        const selectedQueue = queues.find(q => q.id === selectedQueueId);
-                        const filtered = items.filter((item: any) => {
-                          if (item.queue_id) return item.queue_id === selectedQueueId;
-                          return selectedQueue && item.category === selectedQueue.category;
-                        });
-                        setWorkItems(filtered);
-                      } catch (err: any) {
-                        triggerNotification('error', err.message);
-                      }
-                    }} 
-                    className="btn btn-secondary"
-                    style={{ alignSelf: 'flex-start' }}
-                  >
-                    Simulate CSV Import (3 đơn hàng)
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'customer_tracking' && (
+                                                            {activeTab === 'customer_tracking' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <h3 className="panel-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', margin: 0 }}>
                 🔍 Cổng Tra cứu đơn hàng (Customer Tracking Portal)
@@ -2341,222 +1372,7 @@ export default function TenantStaffWorkspace() {
             </div>
           )}
 
-          {activeTab === 'team_management' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <h3 className="panel-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', margin: 0 }}>
-                👥 Quản lý Nhân sự & Chi nhánh Vận hành
-              </h3>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
-                
-                {/* Column 1: Operator Directory */}
-                <div style={{ background: 'var(--bg-surface-elevated)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 style={{ color: '#fff', fontSize: '15px', fontWeight: 600, margin: 0 }}>Danh sách Nhân sự vận hành</h4>
                   </div>
-
-                  {/* Add Operator Form */}
-                  <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!auth) return;
-                    if (!newUserEmail || !newUserFirstName || !newUserLastName) {
-                      triggerNotification('error', 'Vui lòng điền đầy đủ email, họ và tên.');
-                      return;
-                    }
-                    try {
-                      await apiService.createTenantUser(auth, {
-                        email: newUserEmail,
-                        first_name: newUserFirstName,
-                        last_name: newUserLastName,
-                        role: newUserRole
-                      });
-                      triggerNotification('success', 'Đã thêm nhân sự vận hành mới.');
-                      setNewUserEmail('');
-                      setNewUserFirstName('');
-                      setNewUserLastName('');
-                      // reload users
-                      const list = await apiService.getTenantUsers(auth);
-                      setUsers(list || []);
-                    } catch (err: any) {
-                      triggerNotification('error', err.message);
-                    }
-                  }} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px' }}>
-                    <div style={{ gridColumn: 'span 2', fontSize: '11px', fontWeight: 700, color: 'var(--color-secondary)' }}>THÊM NHÂN SỰ MỚI</div>
-                    <input 
-                      type="email" 
-                      placeholder="Email" 
-                      className="form-input" 
-                      style={{ fontSize: '12px', padding: '6px' }}
-                      value={newUserEmail}
-                      onChange={(e) => setNewUserEmail(e.target.value)}
-                    />
-                    <select 
-                      className="form-input" 
-                      style={{ fontSize: '12px', padding: '6px' }}
-                      value={newUserRole}
-                      onChange={(e) => setNewUserRole(e.target.value)}
-                    >
-                      <option value="SME_OPS">SME Operator (Admin)</option>
-                      <option value="FIELD_WORKER">Field Worker (Shipper/Staff)</option>
-                    </select>
-                    <input 
-                      type="text" 
-                      placeholder="Họ" 
-                      className="form-input" 
-                      style={{ fontSize: '12px', padding: '6px' }}
-                      value={newUserLastName}
-                      onChange={(e) => setNewUserLastName(e.target.value)}
-                    />
-                    <input 
-                      type="text" 
-                      placeholder="Tên" 
-                      className="form-input" 
-                      style={{ fontSize: '12px', padding: '6px' }}
-                      value={newUserFirstName}
-                      onChange={(e) => setNewUserFirstName(e.target.value)}
-                    />
-                    <button type="submit" className="btn btn-primary" style={{ gridColumn: 'span 2', padding: '6px 12px', fontSize: '12px', fontWeight: 600 }}>
-                      + Thêm nhân viên
-                    </button>
-                  </form>
-
-                  {/* Users List */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-                    {users.map(u => (
-                      <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.01)', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                        <div>
-                          <div style={{ fontWeight: 600, color: '#fff', fontSize: '13px' }}>
-                            {u.first_name} {u.last_name}
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{u.email}</div>
-                          <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                            <span className="badge badge-unassigned" style={{ fontSize: '9px' }}>{u.role}</span>
-                            <span className={`badge ${u.is_active ? 'badge-completed' : 'badge-low'}`} style={{ fontSize: '9px' }}>
-                              {u.is_active ? 'Hoạt động' : 'Tạm khóa'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button 
-                            type="button"
-                            onClick={async () => {
-                              if (!auth) return;
-                              try {
-                                  await apiService.updateTenantUser(auth, u.id, { is_active: !u.is_active });
-                                  triggerNotification('success', 'Đã thay đổi trạng thái hoạt động.');
-                                  const list = await apiService.getTenantUsers(auth);
-                                  setUsers(list || []);
-                              } catch (err: any) {
-                                triggerNotification('error', err.message);
-                              }
-                            }}
-                            className="btn btn-secondary" 
-                            style={{ padding: '4px 8px', fontSize: '10px' }}
-                          >
-                            {u.is_active ? 'Khóa' : 'Mở'}
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={async () => {
-                              if (!auth) return;
-                              if (!window.confirm(`Bạn có chắc chắn muốn xóa nhân sự ${u.first_name} ${u.last_name}?`)) return;
-                              try {
-                                await apiService.deleteTenantUser(auth, u.id);
-                                triggerNotification('success', 'Đã xóa nhân sự.');
-                                const list = await apiService.getTenantUsers(auth);
-                                setUsers(list || []);
-                              } catch (err: any) {
-                                triggerNotification('error', err.message);
-                              }
-                            }}
-                            className="btn btn-secondary" 
-                            style={{ padding: '4px 8px', fontSize: '10px', color: 'var(--color-accent)' }}
-                          >
-                            Xóa
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {users.length === 0 && (
-                      <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-dim)', fontSize: '12px' }}>Chưa có nhân viên nào.</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Column 2: Branches Structure */}
-                <div style={{ background: 'var(--bg-surface-elevated)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <h4 style={{ color: '#fff', fontSize: '15px', fontWeight: 600, margin: 0 }}>Cấu trúc Chi nhánh (SME Branches)</h4>
-                  <p style={{ fontSize: '12px', color: 'var(--text-dim)', margin: 0 }}>
-                    Định cấu hình các chi nhánh/kho bãi để hệ thống tự động phân chia luồng công việc tương ứng.
-                  </p>
-
-                  {/* Add Branch Form */}
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!newBranchId.trim() || !newBranchName.trim()) {
-                      triggerNotification('error', 'Vui lòng điền đủ mã và tên chi nhánh.');
-                      return;
-                    }
-                    const updated = [...dynamicBranches, { id: newBranchId.trim(), name: newBranchName.trim() }];
-                    setDynamicBranches(updated);
-                    localStorage.setItem('nf_dynamic_branches', JSON.stringify(updated));
-                    setNewBranchId('');
-                    setNewBranchName('');
-                    triggerNotification('success', 'Đã lưu cấu hình chi nhánh mới.');
-                  }} style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-primary)' }}>THÊM CHI NHÁNH MỚI</div>
-                    <input 
-                      type="text" 
-                      placeholder="Mã chi nhánh (vd: branch_q1)" 
-                      className="form-input" 
-                      style={{ fontSize: '12px', padding: '6px' }}
-                      value={newBranchId}
-                      onChange={(e) => setNewBranchId(e.target.value)}
-                    />
-                    <input 
-                      type="text" 
-                      placeholder="Tên chi nhánh" 
-                      className="form-input" 
-                      style={{ fontSize: '12px', padding: '6px' }}
-                      value={newBranchName}
-                      onChange={(e) => setNewBranchName(e.target.value)}
-                    />
-                    <button type="submit" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 600 }}>
-                      + Thêm chi nhánh
-                    </button>
-                  </form>
-
-                  {/* Branches List */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {dynamicBranches.map(b => (
-                      <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.01)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.02)' }}>
-                        <div>
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>{b.name}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>ID: {b.id}</div>
-                        </div>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            const updated = dynamicBranches.filter(x => x.id !== b.id);
-                            setDynamicBranches(updated);
-                            localStorage.setItem('nf_dynamic_branches', JSON.stringify(updated));
-                            triggerNotification('success', 'Đã xoá chi nhánh.');
-                          }}
-                          style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', fontSize: '12px' }}
-                          title="Xóa chi nhánh"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Right Sidebar: Details & Action Console */}
         <div className="panel">
@@ -2592,42 +1408,7 @@ export default function TenantStaffWorkspace() {
                 </div>
               </div>
 
-              <div className="detail-section">
-                <span className="meta-label">NHÂN SỰ PHỤ TRÁCH (MANUAL ASSIGNMENT)</span>
-                <select 
-                  id="assign_user_select"
-                  className="form-input" 
-                  style={{ fontSize: '13px', marginTop: '6px', width: '100%' }}
-                  value={selectedItem.assignee_id || ''}
-                  onChange={async (e) => {
-                    const userId = e.target.value;
-                    if (!auth || !selectedItem) return;
-                    try {
-                      const targetQueue = selectedItem.queue_id || selectedQueueId || queues[0]?.id;
-                      await apiService.routeWorkItem(auth, selectedItem.id, targetQueue, userId || undefined);
-                      // reload work items
-                      const items = await apiService.getWorkItems(auth);
-                      const selectedQ = queues.find(q => q.id === selectedQueueId);
-                      const filtered = items.filter((item: any) => {
-                        if (item.queue_id) return item.queue_id === selectedQueueId;
-                        return selectedQ && item.category === selectedQ.category;
-                      });
-                      setWorkItems(filtered);
-                      // update selected item details
-                      const freshTask = await apiService.getWorkItem(auth, selectedItem.id);
-                      setSelectedItem(freshTask);
-                      triggerNotification('success', 'Đã cập nhật nhân sự xử lý.');
-                    } catch (err: any) {
-                      triggerNotification('error', err.message);
-                    }
-                  }}
-                >
-                  <option value="">-- Chưa phân công --</option>
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.first_name} {u.last_name} ({u.role})</option>
-                  ))}
-                </select>
-              </div>
+              
 
               <div className="detail-section">
                 <span className="meta-label">THAO TÁC XỬ LÝ</span>
@@ -2975,7 +1756,7 @@ export default function TenantStaffWorkspace() {
             </div>
           )}
         </div>
-      </>)}
+
       </div>
 
       {/* Escalation Modal — Phase 2 */}

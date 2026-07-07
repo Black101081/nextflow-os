@@ -3,16 +3,36 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Login() {
-  const [tenantId, setTenantId] = useState('d290f1ee-6c54-4b01-90e6-d701748f0851');
-  const [secret, setSecret] = useState('nf_live_test_d290f1ee-6c54-4b01-90e6-d701748f0851');
+  const location = useLocation();
+
+  const from = location.state?.from?.pathname || '/workspace';
+
+  // Tự động nhận diện port và điền sẵn thông tin (chỉ dành cho test/dev)
+  const isDev = import.meta.env.MODE === 'development' || window.location.hostname === 'localhost';
+  const port = window.location.port;
+
+  let defaultTenantId = '';
+  let defaultSecret = '';
+
+  if (isDev) {
+    if (port === '8081') {
+      // Layer 1: Platform Admin
+      defaultTenantId = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+      defaultSecret = 'nf_platform_secret_admin_key_2026';
+    } else {
+      // Layer 2, 3: Tenant Admin & Staff
+      defaultTenantId = 'd290f1ee-6c54-4b01-90e6-d701748f0851';
+      defaultSecret = 'nf_live_test_d290f1ee-6c54-4b01-90e6-d701748f0851';
+    }
+  }
+
+  const [tenantId, setTenantId] = useState(defaultTenantId);
+  const [secret, setSecret] = useState(defaultSecret);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
   const { login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const from = location.state?.from?.pathname || '/workspace';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,7 +40,7 @@ export default function Login() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/oauth/token', {
+      const response = await fetch('/api/v1/oauth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

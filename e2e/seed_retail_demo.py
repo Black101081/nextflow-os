@@ -4,9 +4,11 @@ import json
 import uuid
 import random
 
-BASE_URL = "http://localhost:8000"
-ADMIN_KEY = "nf_platform_secret_admin_key_2026"
-DB_DSN = "dbname=nextflow_db user=postgres password=postgres host=localhost port=5435"
+import os
+
+BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")
+ADMIN_KEY = os.environ.get("NF_ADMIN_KEY", "nf_platform_secret_admin_key_2026")
+DB_DSN = os.environ.get("DB_DSN", "dbname=nextflow_db user=postgres password=postgres host=localhost port=5435")
 
 print("🚀 Bắt đầu quá trình nạp Retail Pack Ready-To-Run...")
 
