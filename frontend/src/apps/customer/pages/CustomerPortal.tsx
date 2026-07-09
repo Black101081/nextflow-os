@@ -357,10 +357,10 @@ export default function CustomerPortal() {
                       onClick={() => setPaymentTab('crypto')}
                       style={{ 
                         flex: 1, padding: '10px', borderRadius: '6px', border: 'none', 
-                        background: paymentTab === 'crypto' ? 'var(--color-primary)' : 'transparent',
+                        background: paymentTab === 'crypto' ? 'var(--color-accent)' : 'transparent',
                         color: paymentTab === 'crypto' ? '#fff' : 'var(--text-dim)',
                         fontWeight: 600, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                        boxShadow: paymentTab === 'crypto' ? '0 0 15px rgba(59, 130, 246, 0.3)' : 'none'
+                        boxShadow: paymentTab === 'crypto' ? '0 0 15px rgba(34, 197, 94, 0.3)' : 'none'
                       }}
                     >
                       <Wallet size={16} /> Thanh toán Web3 (Crypto)
@@ -622,8 +622,8 @@ export default function CustomerPortal() {
           left: 0;
           right: 0;
           height: 2px;
-          background: linear-gradient(to right, transparent, var(--color-primary), transparent);
-          box-shadow: 0 0 8px var(--color-primary);
+          background: linear-gradient(to right, transparent, var(--color-accent), transparent);
+          box-shadow: 0 0 8px var(--color-accent);
           animation: scan 2s linear infinite;
         }
         @keyframes scan {

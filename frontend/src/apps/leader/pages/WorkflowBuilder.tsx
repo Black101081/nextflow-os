@@ -173,30 +173,30 @@ export default function WorkflowBuilder() {
         
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <h3 style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Logic</h3>
-          <button onClick={() => addNode('conditionNode', 'IF / ELSE')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>
+          <button onClick={() => addNode('conditionNode', 'IF / ELSE')} className="toolbar-btn">
             <GitBranch size={16} color="#f59e0b" /> Condition (IF/ELSE)
           </button>
           
           <h3 style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '16px', marginBottom: '4px' }}>Actions</h3>
-          <button onClick={() => addNode('zaloNode', 'Gửi Zalo ZNS')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>
+          <button onClick={() => addNode('zaloNode', 'Gửi Zalo ZNS')} className="toolbar-btn">
             <MessageCircle size={16} color="#0068ff" /> Zalo ZNS
           </button>
-          <button onClick={() => addNode('approvalNode', 'Yêu cầu Phê Duyệt')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>
+          <button onClick={() => addNode('approvalNode', 'Yêu cầu Phê Duyệt')} className="toolbar-btn">
             <CheckCircle size={16} color="#10b981" /> Node Phê Duyệt
           </button>
-          <button onClick={() => addNode('httpNode', 'HTTP Webhook')} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>
+          <button onClick={() => addNode('httpNode', 'HTTP Webhook')} className="toolbar-btn">
             <Globe size={16} color="#8b5cf6" /> HTTP Request
           </button>
           <h3 style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: '16px', marginBottom: '4px' }}>Mẫu nhanh (Presets)</h3>
           <button 
             onClick={() => loadTemplate('zalo')}
-            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '8px', color: '#60a5fa', cursor: 'pointer', fontSize: '12px', width: '100%', textAlign: 'left' }}
+            className="toolbar-btn-preset-blue"
           >
             Mẫu Zalo ZNS Đơn Mới
           </button>
           <button 
             onClick={() => loadTemplate('webhook')}
-            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.2)', borderRadius: '8px', color: '#a78bfa', cursor: 'pointer', fontSize: '12px', width: '100%', textAlign: 'left', marginTop: '8px' }}
+            className="toolbar-btn-preset-purple"
           >
             Mẫu Webhook Trễ SLA
           </button>
@@ -439,6 +439,74 @@ export default function WorkflowBuilder() {
         }
         .react-flow__controls-button:hover {
           background-color: #475569 !important;
+        }
+        
+        /* Premium Node Palette Toolbar Buttons */
+        .toolbar-btn {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 8px;
+          color: #fff;
+          cursor: pointer;
+          font-weight: 500;
+          transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .toolbar-btn:hover {
+          background: rgba(255, 255, 255, 0.08);
+          border-color: var(--color-primary);
+          transform: translateY(-1px);
+        }
+        
+        .toolbar-btn-preset-blue {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px;
+          background: rgba(59, 130, 246, 0.08);
+          border: 1px solid rgba(59, 130, 246, 0.15);
+          border-radius: 8px;
+          color: #60a5fa;
+          cursor: pointer;
+          font-size: 12px;
+          width: 100%;
+          text-align: left;
+          font-weight: 500;
+          transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .toolbar-btn-preset-blue:hover {
+          background: rgba(59, 130, 246, 0.18);
+          border-color: #60a5fa;
+          transform: translateY(-1px);
+        }
+        
+        .toolbar-btn-preset-purple {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px;
+          background: rgba(139, 92, 246, 0.08);
+          border: 1px solid rgba(139, 92, 246, 0.15);
+          border-radius: 8px;
+          color: #a78bfa;
+          cursor: pointer;
+          font-size: 12px;
+          width: 100%;
+          text-align: left;
+          font-weight: 500;
+          transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+          margin-top: 8px;
+        }
+        
+        .toolbar-btn-preset-purple:hover {
+          background: rgba(139, 92, 246, 0.18);
+          border-color: #a78bfa;
+          transform: translateY(-1px);
         }
       `}</style>
     </div>

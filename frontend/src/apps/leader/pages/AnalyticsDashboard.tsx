@@ -188,7 +188,7 @@ export default function AnalyticsDashboard() {
         
         {/* Doanh thu */}
         {visibleWidgets['revenue'] && (
-          <div className="panel-glass" style={{ background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(10, 12, 16, 0.7) 100%)', boxShadow: '0 8px 32px rgba(16, 185, 129, 0.05)' }}>
+          <div className="panel-glass dashboard-kpi-card-green" style={{ background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(10, 12, 16, 0.7) 100%)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
               <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 600 }}>DOANH THU 24H</span>
               <div style={{ background: 'rgba(16, 185, 129, 0.15)', padding: '8px', borderRadius: '8px', color: 'var(--color-secondary)' }}>
@@ -209,7 +209,7 @@ export default function AnalyticsDashboard() {
 
         {/* Total Tasks */}
         {visibleWidgets['tasks'] && (
-          <div className="panel-glass" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(10, 12, 16, 0.7) 100%)', boxShadow: '0 8px 32px rgba(99, 102, 241, 0.05)' }}>
+          <div className="panel-glass dashboard-kpi-card-indigo" style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(10, 12, 16, 0.7) 100%)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
               <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 600 }}>TỔNG SỐ TASK</span>
               <div style={{ background: 'rgba(99, 102, 241, 0.15)', padding: '8px', borderRadius: '8px', color: 'var(--color-primary)' }}>
@@ -230,7 +230,7 @@ export default function AnalyticsDashboard() {
 
         {/* SLA Breach */}
         {visibleWidgets['sla'] && (
-          <div className="panel-glass" style={{ background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.08) 0%, rgba(10, 12, 16, 0.7) 100%)', boxShadow: '0 8px 32px rgba(244, 63, 94, 0.05)' }}>
+          <div className="panel-glass dashboard-kpi-card-rose" style={{ background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.08) 0%, rgba(10, 12, 16, 0.7) 100%)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
               <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 600 }}>TỈ LỆ VI PHẠM SLA</span>
               <div style={{ background: 'rgba(244, 63, 94, 0.15)', padding: '8px', borderRadius: '8px', color: 'var(--color-accent)' }}>
@@ -251,7 +251,7 @@ export default function AnalyticsDashboard() {
 
         {/* Resolution Time */}
         {visibleWidgets['time'] && (
-          <div className="panel-glass" style={{ background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, rgba(10, 12, 16, 0.7) 100%)', boxShadow: '0 8px 32px rgba(168, 85, 247, 0.05)' }}>
+          <div className="panel-glass dashboard-kpi-card-purple" style={{ background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, rgba(10, 12, 16, 0.7) 100%)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
               <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 600 }}>THỜI GIAN XỬ LÝ (AVG)</span>
               <div style={{ background: 'rgba(168, 85, 247, 0.15)', padding: '8px', borderRadius: '8px', color: '#a855f7' }}>
@@ -442,6 +442,49 @@ export default function AnalyticsDashboard() {
           </div>
         </div>
       )}
+      <style>{`
+        .spinner-icon {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        
+        /* Premium KPI Card Hover & Glow States */
+        .dashboard-kpi-card-green,
+        .dashboard-kpi-card-indigo,
+        .dashboard-kpi-card-rose,
+        .dashboard-kpi-card-purple {
+          transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+          cursor: pointer;
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .dashboard-kpi-card-green:hover {
+          transform: translateY(-3px);
+          border-color: rgba(16, 185, 129, 0.3) !important;
+          box-shadow: 0 12px 30px rgba(16, 185, 129, 0.1) !important;
+        }
+        
+        .dashboard-kpi-card-indigo:hover {
+          transform: translateY(-3px);
+          border-color: rgba(99, 102, 241, 0.3) !important;
+          box-shadow: 0 12px 30px rgba(99, 102, 241, 0.1) !important;
+        }
+        
+        .dashboard-kpi-card-rose:hover {
+          transform: translateY(-3px);
+          border-color: rgba(244, 63, 94, 0.3) !important;
+          box-shadow: 0 12px 30px rgba(244, 63, 94, 0.1) !important;
+        }
+        
+        .dashboard-kpi-card-purple:hover {
+          transform: translateY(-3px);
+          border-color: rgba(168, 85, 247, 0.3) !important;
+          box-shadow: 0 12px 30px rgba(168, 85, 247, 0.1) !important;
+        }
+      `}</style>
     </div>
   );
 }

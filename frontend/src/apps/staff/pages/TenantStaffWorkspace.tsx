@@ -353,18 +353,18 @@ export default function TenantStaffWorkspace() {
                           style={{
                             background: 'rgba(30, 41, 59, 0.4)', padding: '14px',
                             borderRadius: 'var(--radius-md)', border: '1px solid rgba(255, 255, 255, 0.05)',
-                            cursor: 'pointer', transition: 'all var(--transition-fast)',
+                            cursor: 'pointer', transition: 'all 250ms cubic-bezier(0.4, 0, 0.2, 1)',
                             boxShadow: 'var(--shadow-sm)',
                             borderLeft: `3px solid ${dotColor}`
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.borderColor = dotColor;
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                            e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
+                            e.currentTarget.style.boxShadow = `0 12px 24px rgba(0, 0, 0, 0.15), 0 0 10px ${dotColor}22`;
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
-                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.transform = 'translateY(0) scale(1)';
                             e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
                           }}
                         >
