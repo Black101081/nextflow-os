@@ -89,10 +89,10 @@ export default function OmniChannelChat() {
     <div style={{ display: 'flex', height: 'calc(100vh - 100px)', gap: '20px' }}>
       
       {/* Sidebar: Danh sách chat */}
-      <div className="panel-glass" style={{ width: '320px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="panel-glass" style={{ width: '320px', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid var(--border-color)' }}>
         <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <MessageSquare size={20} color="var(--color-primary)" />
-          <h2 style={{ fontSize: '16px', margin: 0, fontWeight: 700 }}>Hộp thư đến</h2>
+          <MessageSquare size={20} color="var(--color-accent)" />
+          <h2 style={{ fontSize: '16px', margin: 0, fontWeight: 700, color: 'var(--text-color)' }}>Hộp thư đến</h2>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {conversations.length === 0 ? (
@@ -104,7 +104,7 @@ export default function OmniChannelChat() {
               <button 
                 onClick={handleSeedDemo}
                 style={{ 
-                  background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', 
+                  background: 'var(--color-accent)', 
                   border: 'none', 
                   color: '#fff', 
                   fontSize: '12px', 
@@ -112,8 +112,11 @@ export default function OmniChannelChat() {
                   borderRadius: '8px', 
                   cursor: 'pointer', 
                   fontWeight: 600,
-                  boxShadow: '0 4px 10px rgba(79, 70, 229, 0.2)'
+                  boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)',
+                  transition: 'all 0.2s'
                 }}
+                onMouseOver={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
+                onMouseOut={(e) => e.currentTarget.style.filter = 'none'}
               >
                 Nạp dữ liệu hội thoại mẫu
               </button>
@@ -123,17 +126,18 @@ export default function OmniChannelChat() {
               <div 
                 key={conv.id}
                 onClick={() => setActiveConv(conv)}
+                className="chat-list-item"
                 style={{ 
                   padding: '16px 20px', 
                   borderBottom: '1px solid rgba(255,255,255,0.05)',
                   cursor: 'pointer',
-                  background: activeConv?.id === conv.id ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
-                  borderLeft: activeConv?.id === conv.id ? '3px solid var(--color-primary)' : '3px solid transparent',
-                  transition: 'background 0.2s'
+                  background: activeConv?.id === conv.id ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
+                  borderLeft: activeConv?.id === conv.id ? '3px solid var(--color-accent)' : '3px solid transparent',
+                  transition: 'all 0.2s'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#fff' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: activeConv?.id === conv.id ? 'var(--color-accent)' : '#fff' }}>
                     Tracking: {conv.work_item_id ? conv.work_item_id.substring(0, 8) : 'Khách vãng lai'}
                   </span>
                   <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
@@ -141,7 +145,7 @@ export default function OmniChannelChat() {
                   </span>
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></div>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e' }}></div>
                   Đang mở
                 </div>
               </div>
@@ -157,15 +161,23 @@ export default function OmniChannelChat() {
             {/* Chat Header */}
             <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '16px' }}>Phiên hỗ trợ trực tuyến</h3>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', color: '#fff', fontWeight: 600 }}>Phiên hỗ trợ trực tuyến</h3>
                 <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
                   ID: {activeConv.id}
                 </div>
               </div>
               <button 
                 style={{ 
-                  padding: '8px 16px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)', 
-                  borderRadius: '6px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600
+                  padding: '8px 16px', background: 'rgba(34, 197, 94, 0.1)', color: 'var(--color-accent)', border: '1px solid rgba(34, 197, 94, 0.2)', 
+                  borderRadius: '6px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'var(--color-accent)';
+                  e.currentTarget.style.color = '#fff';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(34, 197, 94, 0.1)';
+                  e.currentTarget.style.color = 'var(--color-accent)';
                 }}
               >
                 <CheckCircle size={16} /> Mark as Resolved
@@ -179,28 +191,45 @@ export default function OmniChannelChat() {
                 const isAi = msg.sender_type === 'AI';
                 const isCustomer = msg.sender_type === 'CUSTOMER';
                 
-                let bubbleClass = "chat-bubble chat-bubble-left";
+                let bubbleStyle: React.CSSProperties = {
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                };
+
                 if (isOp) {
-                  bubbleClass = "chat-bubble chat-bubble-right";
+                  bubbleStyle.background = 'var(--color-accent)';
+                  bubbleStyle.color = '#fff';
+                  bubbleStyle.borderRadius = '12px 12px 0 12px';
                 } else if (isAi) {
-                  bubbleClass = "chat-bubble chat-bubble-ai";
+                  bubbleStyle.background = 'rgba(168, 85, 247, 0.1)';
+                  bubbleStyle.color = '#e9d5ff';
+                  bubbleStyle.border = '1px solid rgba(168, 85, 247, 0.2)';
+                  bubbleStyle.borderRadius = '12px 12px 12px 0';
+                } else {
+                  bubbleStyle.background = 'rgba(255, 255, 255, 0.05)';
+                  bubbleStyle.color = '#f8fafc';
+                  bubbleStyle.border = '1px solid rgba(255, 255, 255, 0.08)';
+                  bubbleStyle.borderRadius = '12px 12px 12px 0';
                 }
 
                 return (
-                  <div key={msg.id} style={{ 
+                  <div key={msg.id} className="chat-msg-row" style={{ 
                     alignSelf: isOp ? 'flex-end' : 'flex-start',
                     maxWidth: '70%',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '4px'
+                    gap: '4px',
+                    animation: 'msgFadeIn 0.25s ease-out'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-dim)', alignSelf: isOp ? 'flex-end' : 'flex-start' }}>
                       {isOp ? 'Bạn' : (isAi ? 'AI Triage Agent' : 'Khách hàng')}
                       {isAi && <Bot size={12} color="#a855f7" />}
                       {isCustomer && <User size={12} />}
-                      {isOp && <ShieldCheck size={12} color="var(--color-primary)" />}
+                      {isOp && <ShieldCheck size={12} color="var(--color-accent)" />}
                     </div>
-                    <div className={bubbleClass}>
+                    <div style={bubbleStyle}>
                       {msg.content}
                     </div>
                     <div style={{ fontSize: '10px', color: 'var(--text-muted)', alignSelf: isOp ? 'flex-end' : 'flex-start' }}>
@@ -221,18 +250,26 @@ export default function OmniChannelChat() {
                   onChange={e => setInput(e.target.value)}
                   placeholder="Nhập tin nhắn để trả lời khách hàng..."
                   disabled={loading}
-                  className="input-premium"
-                  style={{ flex: 1, padding: '12px 16px' }}
+                  style={{ 
+                    flex: 1, padding: '12px 16px', borderRadius: '8px', 
+                    background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-color)', 
+                    color: '#fff', outline: 'none', transition: 'border-color 0.2s' 
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = 'var(--color-accent)'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
                 />
                 <button 
                   type="submit"
                   disabled={loading || !input.trim()}
                   style={{
                     padding: '0 24px', borderRadius: '8px',
-                    background: 'var(--color-primary)', border: 'none', color: '#fff',
+                    background: 'var(--color-accent)', border: 'none', color: '#fff',
                     display: 'flex', alignItems: 'center', gap: '8px',
-                    cursor: 'pointer', fontWeight: 600, opacity: (loading || !input.trim()) ? 0.5 : 1
+                    cursor: 'pointer', fontWeight: 600, transition: 'all 0.2s',
+                    opacity: (loading || !input.trim()) ? 0.5 : 1
                   }}
+                  onMouseOver={(e) => { if(!loading && input.trim()) e.currentTarget.style.filter = 'brightness(1.1)'; }}
+                  onMouseOut={(e) => e.currentTarget.style.filter = 'none'}
                 >
                   {loading ? <Loader2 size={18} className="spinner-icon" /> : 'Gửi'} <Send size={18} />
                 </button>
@@ -242,7 +279,7 @@ export default function OmniChannelChat() {
         ) : (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
             <MessageSquare size={48} opacity={0.2} style={{ marginBottom: '16px' }} />
-            <h3 style={{ margin: '0 0 8px 0' }}>Omni-Channel Chat</h3>
+            <h3 style={{ margin: '0 0 8px 0', color: '#fff' }}>Omni-Channel Chat</h3>
             <p style={{ fontSize: '14px', margin: 0 }}>Chọn một phiên trò chuyện bên trái để bắt đầu hỗ trợ.</p>
           </div>
         )}
@@ -250,10 +287,10 @@ export default function OmniChannelChat() {
 
       {/* CRM Customer Profile Panel */}
       {activeConv && (
-        <div className="panel-glass" style={{ width: '320px', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+        <div className="panel-glass crm-panel" style={{ width: '320px', display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: '20px' }}>
           <div style={{ padding: '0 0 16px 0', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <User size={18} color="var(--color-primary)" />
-            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Hồ sơ khách hàng (CRM)</h3>
+            <User size={18} color="var(--color-accent)" />
+            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#fff' }}>Hồ sơ khách hàng (CRM)</h3>
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '16px' }}>
@@ -262,21 +299,21 @@ export default function OmniChannelChat() {
               <div style={{ fontSize: '16px', fontWeight: 700, color: '#fff', marginBottom: '4px' }}>
                 Nguyễn Thị Lan Anh
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-dim)' }}>
                 SĐT: 0984.556.782
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-dim)' }}>
                 Đ/C: Cầu Giấy, Hà Nội
               </div>
             </div>
 
             {/* Loyalty Tier */}
-            <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '12px', borderRadius: '8px' }}>
+            <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '12px', borderRadius: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--color-warning)', fontWeight: 700 }}>HẠNG VÀNG (GOLD)</span>
-                <span style={{ fontSize: '11px', color: '#fff', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>2,450 pts</span>
+                <span style={{ fontSize: '11px', color: '#fbbf24', fontWeight: 700 }}>HẠNG VÀNG (GOLD)</span>
+                <span style={{ fontSize: '11px', color: '#fff', background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>2,450 pts</span>
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-dim)', lineHeight: 1.4 }}>
                 Khách hàng thân thiết từ 2025. Tặng Voucher 10% dịp sinh nhật.
               </div>
             </div>
@@ -285,24 +322,24 @@ export default function OmniChannelChat() {
             <div>
               <h4 style={{ fontSize: '13px', color: '#fff', fontWeight: 600, marginBottom: '10px' }}>Lịch sử đơn (KiotViet)</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                <div className="crm-order-item" style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', fontSize: '12px', transition: 'border-color 0.2s' }}>
                   <div>
                     <div style={{ fontWeight: 600, color: '#fff' }}>DH000921</div>
-                    <div style={{ color: 'var(--text-dim)' }}>20/06/2026</div>
+                    <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>20/06/2026</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--color-secondary)' }}>450,000đ</div>
-                    <div style={{ color: 'var(--color-secondary)', fontSize: '10px' }}>Đã giao</div>
+                    <div style={{ fontWeight: 600, color: 'var(--color-accent)' }}>450,000đ</div>
+                    <div style={{ color: 'var(--color-accent)', fontSize: '10px' }}>Đã giao</div>
                   </div>
                 </div>
-                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                <div className="crm-order-item" style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', fontSize: '12px', transition: 'border-color 0.2s' }}>
                   <div>
                     <div style={{ fontWeight: 600, color: '#fff' }}>DH000854</div>
-                    <div style={{ color: 'var(--text-dim)' }}>15/05/2026</div>
+                    <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>15/05/2026</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontWeight: 600, color: 'var(--text-muted)' }}>1,200,000đ</div>
-                    <div style={{ color: 'var(--text-dim)', fontSize: '10px' }}>Hoàn thành</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '10px' }}>Hoàn thành</div>
                   </div>
                 </div>
               </div>
@@ -313,18 +350,22 @@ export default function OmniChannelChat() {
               <button 
                 onClick={() => alert('Đã gửi VietQR cho khách!')}
                 style={{ 
-                  width: '100%', padding: '10px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', 
-                  color: 'var(--color-primary)', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' 
+                  width: '100%', padding: '10px', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.2)', 
+                  color: 'var(--color-accent)', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s'
                 }}
+                onMouseOver={(e) => { e.currentTarget.style.background = 'var(--color-accent)'; e.currentTarget.style.color = '#fff'; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(34, 197, 94, 0.1)'; e.currentTarget.style.color = 'var(--color-accent)'; }}
               >
                 Gửi mã VietQR thanh toán
               </button>
               <button 
                 onClick={() => alert('Đã kích hoạt Workflow CSKH Zalo!')}
                 style={{ 
-                  width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', 
-                  color: 'var(--text-main)', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' 
+                  width: '100%', padding: '10px', background: 'transparent', border: '1px solid var(--border-color)', 
+                  color: 'var(--text-color)', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s'
                 }}
+                onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--color-accent)'}
+                onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
               >
                 Kích hoạt CSKH Zalo ZNS
               </button>
@@ -333,6 +374,25 @@ export default function OmniChannelChat() {
           </div>
         </div>
       )}
+      <style>{`
+        .chat-list-item:hover {
+          background: rgba(255,255,255,0.02) !important;
+        }
+        .crm-order-item:hover {
+          border-color: rgba(255,255,255,0.15) !important;
+        }
+        @keyframes msgFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .spinner-icon {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

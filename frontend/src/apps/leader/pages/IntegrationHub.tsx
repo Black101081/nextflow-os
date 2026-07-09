@@ -115,17 +115,17 @@ export default function IntegrationHub() {
           const installed = isInstalled(app.id);
 
           return (
-            <div key={app.id} className="panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', overflow: 'hidden' }}>
+            <div key={app.id} className="panel app-integration-card" style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', overflow: 'hidden' }}>
               {/* Highlight bar at top */}
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: installed ? 'var(--color-secondary)' : 'rgba(255,255,255,0.1)' }}></div>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: installed ? 'var(--color-accent)' : 'rgba(255,255,255,0.05)' }}></div>
               
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '16px' }}>
                 <div style={{ 
                   width: '48px', height: '48px', borderRadius: '12px', 
-                  background: installed ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.05)',
+                  background: installed ? 'rgba(34, 197, 150, 0.1)' : 'rgba(255,255,255,0.05)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: installed ? 'var(--color-secondary)' : 'var(--text-muted)',
-                  border: `1px solid ${installed ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255,255,255,0.1)'}`
+                  color: installed ? 'var(--color-accent)' : 'var(--text-muted)',
+                  border: `1px solid ${installed ? 'rgba(34, 197, 150, 0.3)' : 'rgba(255,255,255,0.1)'}`
                 }}>
                   <Icon size={24} />
                 </div>
@@ -133,7 +133,7 @@ export default function IntegrationHub() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 600 }}>{app.name}</h3>
                   </div>
-                  <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: 'rgba(34, 197, 94, 0.15)', color: 'var(--color-accent)' }}>
                     {app.category}
                   </span>
                 </div>
@@ -146,12 +146,14 @@ export default function IntegrationHub() {
               <div style={{ marginTop: 'auto' }}>
                 {installed ? (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-secondary)', fontSize: '13px', fontWeight: 600 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-accent)', fontSize: '13px', fontWeight: 600 }}>
                       <CheckCircle size={16} /> Đã kết nối
                     </div>
                     <button 
                       onClick={() => handleOpenInstall(app)}
-                      style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-color)', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s' }}
+                      onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--color-accent)'}
+                      onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
                     >
                       <Settings size={14} /> Cấu hình
                     </button>
@@ -159,9 +161,9 @@ export default function IntegrationHub() {
                 ) : (
                   <button 
                     onClick={() => handleOpenInstall(app)}
-                    style={{ width: '100%', background: 'var(--color-primary)', border: 'none', color: '#fff', padding: '10px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'background 0.2s' }}
-                    onMouseOver={(e) => e.currentTarget.style.background = '#2563eb'}
-                    onMouseOut={(e) => e.currentTarget.style.background = 'var(--color-primary)'}
+                    style={{ width: '100%', background: 'var(--color-accent)', border: 'none', color: '#fff', padding: '10px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s' }}
+                    onMouseOver={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
+                    onMouseOut={(e) => e.currentTarget.style.filter = 'none'}
                   >
                     <DownloadCloud size={16} /> Cài đặt
                   </button>
@@ -174,8 +176,8 @@ export default function IntegrationHub() {
 
       {/* Modal Cài đặt */}
       {selectedApp && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="panel" style={{ width: '100%', maxWidth: '480px', position: 'relative' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(2, 6, 23, 0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="panel" style={{ width: '100%', maxWidth: '480px', position: 'relative', border: '1px solid rgba(255, 255, 255, 0.1)', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)' }}>
             <button 
               onClick={() => !installing && setSelectedApp(null)}
               style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
@@ -184,7 +186,7 @@ export default function IntegrationHub() {
             </button>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary)' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(34, 197, 94, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)' }}>
                 {React.createElement(IconMap[selectedApp.icon_url] || AppWindow, { size: 24 })}
               </div>
               <div>
@@ -196,7 +198,7 @@ export default function IntegrationHub() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
               {selectedApp.fields_required.map((field: string) => (
                 <div key={field}>
-                  <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-color)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-color)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
                     {field.replace('_', ' ')}
                   </label>
                   <input 
@@ -205,7 +207,9 @@ export default function IntegrationHub() {
                     onChange={(e) => setCredentials({ ...credentials, [field]: e.target.value })}
                     placeholder={`Nhập ${field}...`}
                     disabled={installing}
-                    style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', color: '#fff' }}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border-color)', color: '#fff', outline: 'none', transition: 'border-color 0.2s' }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = 'var(--color-accent)'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
                   />
                 </div>
               ))}
@@ -215,14 +219,18 @@ export default function IntegrationHub() {
               <button 
                 onClick={() => setSelectedApp(null)}
                 disabled={installing}
-                style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-color)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-color)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
               >
                 Hủy
               </button>
               <button 
                 onClick={handleInstall}
                 disabled={installing}
-                style={{ flex: 2, padding: '12px', background: 'var(--color-primary)', border: 'none', color: '#fff', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                style={{ flex: 2, padding: '12px', background: 'var(--color-accent)', border: 'none', color: '#fff', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s' }}
+                onMouseOver={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
+                onMouseOut={(e) => e.currentTarget.style.filter = 'none'}
               >
                 {installing ? (
                   <>
@@ -238,6 +246,17 @@ export default function IntegrationHub() {
       )}
 
       <style>{`
+        .app-integration-card {
+          background: rgba(30, 41, 59, 0.45) !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          backdrop-filter: blur(16px);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .app-integration-card:hover {
+          transform: translateY(-5px);
+          border-color: var(--color-accent) !important;
+          box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2), 0 0 15px rgba(34, 197, 94, 0.15) !important;
+        }
         .spinner-icon {
           animation: spin 1s linear infinite;
         }

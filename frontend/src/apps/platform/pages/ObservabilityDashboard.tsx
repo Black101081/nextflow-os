@@ -83,83 +83,83 @@ export default function ObservabilityDashboard() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           
           {/* Top Row: System Metrics Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
-            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+            <div className="metrics-card" style={{ background: 'rgba(30, 41, 59, 0.45)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '20px', backdropFilter: 'blur(16px)', transition: 'all 0.3s' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>CPU LOAD</span>
-                <Cpu size={18} color="#3b82f6" />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>CPU LOAD</span>
+                <Cpu size={18} color="var(--color-accent)" />
               </div>
-              <div style={{ fontSize: '24px', fontWeight: 700, color: '#fff', marginBottom: '8px' }}>{observabilityData.system.cpu_usage}%</div>
-              <div style={{ width: '100%', height: '6px', background: '#0f172a', borderRadius: '3px', overflow: 'hidden' }}>
-                <div style={{ width: `${observabilityData.system.cpu_usage}%`, height: '100%', background: '#3b82f6', borderRadius: '3px' }}></div>
+              <div style={{ fontSize: '28px', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>{observabilityData.system.cpu_usage}%</div>
+              <div style={{ width: '100%', height: '6px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '3px', overflow: 'hidden' }}>
+                <div style={{ width: `${observabilityData.system.cpu_usage}%`, height: '100%', background: 'var(--color-accent)', borderRadius: '3px', boxShadow: '0 0 8px var(--color-accent)' }}></div>
               </div>
             </div>
 
-            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '20px' }}>
+            <div className="metrics-card" style={{ background: 'rgba(30, 41, 59, 0.45)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '20px', backdropFilter: 'blur(16px)', transition: 'all 0.3s' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>RAM USAGE</span>
-                <Server size={18} color="#10b981" />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>RAM USAGE</span>
+                <Server size={18} color="var(--color-accent)" />
               </div>
-              <div style={{ fontSize: '24px', fontWeight: 700, color: '#fff', marginBottom: '8px' }}>{observabilityData.system.ram_usage}%</div>
-              <div style={{ width: '100%', height: '6px', background: '#0f172a', borderRadius: '3px', overflow: 'hidden' }}>
-                <div style={{ width: `${observabilityData.system.ram_usage}%`, height: '100%', background: '#10b981', borderRadius: '3px' }}></div>
+              <div style={{ fontSize: '28px', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>{observabilityData.system.ram_usage}%</div>
+              <div style={{ width: '100%', height: '6px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '3px', overflow: 'hidden' }}>
+                <div style={{ width: `${observabilityData.system.ram_usage}%`, height: '100%', background: 'var(--color-accent)', borderRadius: '3px', boxShadow: '0 0 8px var(--color-accent)' }}></div>
               </div>
             </div>
 
-            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '20px' }}>
+            <div className="metrics-card" style={{ background: 'rgba(30, 41, 59, 0.45)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '20px', backdropFilter: 'blur(16px)', transition: 'all 0.3s' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>DISK STATUS</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>DISK STATUS</span>
                 <HardDrive size={18} color="#a855f7" />
               </div>
-              <div style={{ fontSize: '24px', fontWeight: 700, color: '#fff', marginBottom: '8px' }}>{observabilityData.system.disk_usage}%</div>
-              <div style={{ width: '100%', height: '6px', background: '#0f172a', borderRadius: '3px', overflow: 'hidden' }}>
-                <div style={{ width: `${observabilityData.system.disk_usage}%`, height: '100%', background: '#a855f7', borderRadius: '3px' }}></div>
+              <div style={{ fontSize: '28px', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>{observabilityData.system.disk_usage}%</div>
+              <div style={{ width: '100%', height: '6px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '3px', overflow: 'hidden' }}>
+                <div style={{ width: `${observabilityData.system.disk_usage}%`, height: '100%', background: '#a855f7', borderRadius: '3px', boxShadow: '0 0 8px #a855f7' }}></div>
               </div>
             </div>
 
-            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '20px' }}>
+            <div className="metrics-card" style={{ background: 'rgba(30, 41, 59, 0.45)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '20px', backdropFilter: 'blur(16px)', transition: 'all 0.3s' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>SERVER UPTIME</span>
-                <Clock size={18} color="#f59e0b" />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>SERVER UPTIME</span>
+                <Clock size={18} color="#fbbf24" />
               </div>
-              <div style={{ fontSize: '24px', fontWeight: 700, color: '#fff', marginBottom: '4px' }}>{observabilityData.system.uptime_hours} hrs</div>
-              <div style={{ fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%', display: 'inline-block' }}></span>
-                System is healthy & online
+              <div style={{ fontSize: '28px', fontWeight: 800, color: '#fff', marginBottom: '4px' }}>{observabilityData.system.uptime_hours} hrs</div>
+              <div style={{ fontSize: '12px', color: '#22c55e', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                <span style={{ width: '8px', height: '8px', background: '#22c55e', borderRadius: '50%', display: 'inline-block', boxShadow: '0 0 8px #22c55e' }}></span>
+                Online & Stable
               </div>
             </div>
           </div>
 
           {/* Middle Row: Recharts Global Traffic Analysis */}
-          <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: 700 }}>Biểu đồ Lưu lượng Platform Requests (24h qua)</h3>
+          <div style={{ background: 'rgba(30, 41, 59, 0.45)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', backdropFilter: 'blur(16px)' }}>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: 700, color: '#fff' }}>Biểu đồ Lưu lượng Platform Requests (24h qua)</h3>
             <div style={{ width: '100%', height: 260 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorRequests" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.25}/>
+                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                   <XAxis dataKey="name" stroke="#64748b" style={{ fontSize: '11px' }} />
                   <YAxis stroke="#64748b" style={{ fontSize: '11px' }} />
-                  <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff', fontSize: '12px' }} />
-                  <Area type="monotone" dataKey="requests" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorRequests)" name="API Requests" />
+                  <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '12px' }} />
+                  <Area type="monotone" dataKey="requests" stroke="var(--color-accent)" strokeWidth={2} fillOpacity={1} fill="url(#colorRequests)" name="API Requests" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Bottom Row: Active Tenants Health & Workload Table */}
-          <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '24px' }}>
-            <h3 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: 700 }}>Chi tiết hiệu năng từng Doanh nghiệp (Multi-Tenant Health)</h3>
+          <div style={{ background: 'rgba(30, 41, 59, 0.45)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '16px', padding: '24px', backdropFilter: 'blur(16px)' }}>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: 700, color: '#fff' }}>Chi tiết hiệu năng từng Doanh nghiệp (Multi-Tenant Health)</h3>
             
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #334155', color: '#94a3b8' }}>
+                  <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: 'var(--text-muted)' }}>
                     <th style={{ padding: '16px 12px', fontWeight: 600 }}>TÊN DOANH NGHIỆP</th>
                     <th style={{ padding: '16px 12px', fontWeight: 600 }}>DOMAIN</th>
                     <th style={{ padding: '16px 12px', fontWeight: 600 }}>HẠN MỨC (TIER)</th>
@@ -170,13 +170,13 @@ export default function ObservabilityDashboard() {
                 </thead>
                 <tbody>
                   {observabilityData.tenants.map((tenant: any) => (
-                    <tr key={tenant.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <tr key={tenant.id} className="tenant-row" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s' }}>
                       <td style={{ padding: '16px 12px', fontWeight: 600, color: '#fff' }}>{tenant.company_name}</td>
-                      <td style={{ padding: '16px 12px', color: '#94a3b8' }}>{tenant.domain}</td>
+                      <td style={{ padding: '16px 12px', color: 'var(--text-dim)' }}>{tenant.domain}</td>
                       <td style={{ padding: '16px 12px' }}>
                         <span style={{ 
                           fontSize: '11px', 
-                          fontWeight: 600,
+                          fontWeight: 700,
                           padding: '2px 8px',
                           borderRadius: '12px',
                           background: tenant.subscription_tier === 'ENTERPRISE' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)',
@@ -188,17 +188,17 @@ export default function ObservabilityDashboard() {
                       <td style={{ padding: '16px 12px', fontWeight: 600, color: '#fff' }}>
                         {tenant.task_count} tác vụ
                       </td>
-                      <td style={{ padding: '16px 12px', color: tenant.error_count > 0 ? '#ef4444' : '#94a3b8' }}>
+                      <td style={{ padding: '16px 12px', color: tenant.error_count > 0 ? '#ef4444' : 'var(--text-dim)', fontWeight: tenant.error_count > 0 ? 600 : 400 }}>
                         {tenant.error_count} lỗi phát sinh
                       </td>
                       <td style={{ padding: '16px 12px' }}>
                         <span style={{ 
                           fontSize: '11px', 
-                          fontWeight: 600,
+                          fontWeight: 700,
                           padding: '4px 10px',
                           borderRadius: '16px',
-                          background: tenant.health_status === 'HEALTHY' ? 'rgba(16, 185, 129, 0.15)' : tenant.health_status === 'WARNING' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                          color: tenant.health_status === 'HEALTHY' ? '#34d399' : tenant.health_status === 'WARNING' ? '#fbbf24' : '#f87171',
+                          background: tenant.health_status === 'HEALTHY' ? 'rgba(34, 197, 94, 0.1)' : tenant.health_status === 'WARNING' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                          color: tenant.health_status === 'HEALTHY' ? 'var(--color-accent)' : tenant.health_status === 'WARNING' ? '#fbbf24' : '#f87171',
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px'
@@ -207,10 +207,11 @@ export default function ObservabilityDashboard() {
                             width: '6px', 
                             height: '6px', 
                             borderRadius: '50%', 
-                            background: tenant.health_status === 'HEALTHY' ? '#10b981' : tenant.health_status === 'WARNING' ? '#f59e0b' : '#ef4444',
-                            display: 'inline-block' 
+                            background: tenant.health_status === 'HEALTHY' ? 'var(--color-accent)' : tenant.health_status === 'WARNING' ? '#fbbf24' : '#ef4444',
+                            display: 'inline-block',
+                            boxShadow: `0 0 6px ${tenant.health_status === 'HEALTHY' ? 'var(--color-accent)' : tenant.health_status === 'WARNING' ? '#fbbf24' : '#ef4444'}`
                           }}></span>
-                          {tenant.health_status === 'HEALTHY' ? 'AN TOÀN (Healthy)' : tenant.health_status === 'WARNING' ? 'CẢNH BÁO (Warning)' : 'NGUY HIỂM (Critical)'}
+                          {tenant.health_status === 'HEALTHY' ? 'AN TOÀN' : tenant.health_status === 'WARNING' ? 'CẢNH BÁO' : 'NGUY HIỂM'}
                         </span>
                       </td>
                     </tr>
@@ -222,6 +223,17 @@ export default function ObservabilityDashboard() {
 
         </div>
       )}
+      <style>{`
+        .spin-animation { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .metrics-card:hover {
+          transform: translateY(-3px);
+          border-color: var(--color-accent) !important;
+        }
+        .tenant-row:hover {
+          background: rgba(255, 255, 255, 0.02) !important;
+        }
+      `}</style>
     </div>
   );
 }
