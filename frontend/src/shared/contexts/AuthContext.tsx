@@ -78,6 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setUser(decoded);
           localStorage.setItem('nf_access_token', token);
+          localStorage.setItem('nf_tenant_id', decoded.tenant_id);
         }
       } catch (e) {
         console.error("Invalid token", e);
@@ -86,6 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       setUser(null);
       localStorage.removeItem('nf_access_token');
+      localStorage.removeItem('nf_tenant_id');
     }
   }, [token]);
 
