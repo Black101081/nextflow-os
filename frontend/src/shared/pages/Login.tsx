@@ -8,22 +8,20 @@ export default function Login() {
   const from = location.state?.from?.pathname || '/workspace';
 
   // Tự động nhận diện port và điền sẵn thông tin (chỉ dành cho test/dev)
-  const isDev = import.meta.env.MODE === 'development' || window.location.hostname === 'localhost';
+  const hostname = window.location.hostname;
   const port = window.location.port;
 
   let defaultTenantId = '';
   let defaultSecret = '';
 
-  if (isDev) {
-    if (port === '8081') {
-      // Layer 1: Platform Admin
-      defaultTenantId = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
-      defaultSecret = 'nf_platform_secret_admin_key_2026';
-    } else {
-      // Layer 2, 3: Tenant Admin & Staff
-      defaultTenantId = 'd290f1ee-6c54-4b01-90e6-d701748f0851';
-      defaultSecret = 'nf_live_test_d290f1ee-6c54-4b01-90e6-d701748f0851';
-    }
+  if (port === '8081' || hostname.startsWith('platform')) {
+    // Layer 1: Platform Admin
+    defaultTenantId = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+    defaultSecret = 'nf_platform_secret_admin_key_2026';
+  } else {
+    // Layer 2, 3: Tenant Admin & Staff
+    defaultTenantId = 'd290f1ee-6c54-4b01-90e6-d701748f0851';
+    defaultSecret = 'nf_live_test_d290f1ee-6c54-4b01-90e6-d701748f0851';
   }
 
   const [tenantId, setTenantId] = useState(defaultTenantId);
