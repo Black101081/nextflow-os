@@ -37,9 +37,10 @@ def validate_record(record: dict) -> tuple[bool, Optional[str]]:
         return False, f"DQ_001: work_item_id hoặc tenant_id không đúng định dạng UUID."
 
     # DQ_003: Validity — handling_time_seconds không được âm
-    # (Tính từ payload nếu có started_at và completed_at)
-    started_at = record.get("started_at")
-    completed_at = record.get("completed_at")
+    # (Tính từ payload nếu có started_at và completed_at, hỗ trợ entity_records)
+    started_at = record.get("started_at") or (record.get("record_data") or {}).get("started_at")
+    completed_at = record.get("completed_at") or (record.get("record_data") or {}).get("completed_at")
+    
     if started_at and completed_at:
         try:
             from datetime import datetime

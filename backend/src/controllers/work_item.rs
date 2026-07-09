@@ -353,6 +353,18 @@ pub async fn update_work_item_status(
     }).to_string());
 
     if is_completed {
+        // Gamification: Award points to the assignee if they completed the task
+        if let Some(assignee) = row.get::<Option<Uuid>, _>("assignee_id") {
+            let _ = crate::controllers::gamification::award_points_internal(
+                &state.pool, 
+                tenant.tenant_id, 
+                assignee, 
+                Some(id), 
+                10, 
+                "Hoàn thành nhiệm vụ"
+            ).await;
+        }
+
         crate::services::webhook_dispatcher::dispatch_event(
             &state.pool,
             tenant.tenant_id,

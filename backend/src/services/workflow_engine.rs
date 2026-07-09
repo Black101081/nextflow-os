@@ -24,6 +24,9 @@ pub enum NodeType {
     
     /// Webhook đẩy dữ liệu ra hệ thống ngoài
     WebhookCall { url: String, method: String },
+    
+    /// Gửi tin nhắn Zalo ZNS
+    ZaloZNSNode { phone_number: String, template_id: String, template_data: Value },
 }
 
 /// Một Nút trong Đồ thị Workflow
@@ -196,15 +199,47 @@ impl WorkflowRunner {
                 let actual_prompt = context.interpolate_string(prompt_template);
                 println!("[Workflow] Magic AI Node: Running model {} with prompt: {}", model, actual_prompt);
                 
-                // Lưu kết quả theo ID của Node
+                // Simulate AI Auto-Triage extraction from unstructured text
+                let priority_pred = if actual_prompt.to_lowercase().contains("khẩn cấp") || actual_prompt.to_lowercase().contains("urgent") {
+                    "HIGH"
+                } else {
+                    "NORMAL"
+                };
+
+                let category_pred = if actual_prompt.to_lowercase().contains("hoá đơn") || actual_prompt.to_lowercase().contains("vat") || actual_prompt.to_lowercase().contains("thanh toán") {
+                    "FINANCE"
+                } else {
+                    "OPERATIONS"
+                };
+
+                let ai_result = serde_json::json!({
+                    "predicted_priority": priority_pred,
+                    "predicted_category": category_pred,
+                    "confidence_score": 0.92,
+                    "model_used": model,
+                    "rationale": format!("Extracted from prompt text using model {}", model)
+                });
+
+                // Lưu kết quả theo ID của Node vào context
                 let res_key = format!("node_{}", node.id);
-                context.variables.insert(res_key, Value::String("AI Đã duyệt".to_string()));
+                context.variables.insert(res_key, ai_result);
+                
+                println!("[Workflow] AI Result: Priority={}, Category={}", priority_pred, category_pred);
                 Ok(None)
             }
             NodeType::BlockchainAnchor { data_payload: _ } => {
                 println!("[Workflow] Magic Blockchain Node: Anchoring data...");
+                // Calculate a mock hash of the current payload
+                let hash = crate::services::blockchain::compute_invoice_data_hash(
+                    uuid::Uuid::new_v4(), // Mock ID for now
+                    100.0,
+                    "USD",
+                    "COMPLETED"
+                );
+                let tx_hash = crate::services::blockchain::anchor_data_on_chain(&hash).await;
+                
                 let res_key = format!("node_{}", node.id);
-                context.variables.insert(res_key, Value::String("0xABC123...".to_string()));
+                context.variables.insert(res_key, Value::String(tx_hash));
                 Ok(None)
             }
             NodeType::WebhookCall { url, method } => {
@@ -212,6 +247,61 @@ impl WorkflowRunner {
                 println!("[Workflow] Action: Calling external Webhook {} {}", method, actual_url);
                 Ok(None)
             }
+            NodeType::ZaloZNSNode { phone_number, template_id, template_data } => {
+                let actual_phone = context.interpolate_string(phone_number);
+                let actual_template = context.interpolate_string(template_id);
+                println!("[Workflow] Action: Sending Zalo ZNS to {}, template: {}", actual_phone, actual_template);
+                Ok(None)
+            }
         }
     }
 }
+
+/// Helper function to trigger a workflow based on an event
+pub async fn trigger_workflow_for_event(
+    pool: &sqlx::PgPool,
+    tenant_id: uuid::Uuid,
+    event_name: &str,
+    payload: Value,
+) -> Result<(), String> {
+    // Tìm cấu hình Workflow từ DB
+    let query = r#"
+        SELECT dag_json 
+        FROM nf_meta.workflow_definitions 
+        WHERE tenant_id = $1 AND trigger_event = $2 AND is_active = true
+        LIMIT 1
+    "#;
+
+    use sqlx::Row;
+    let row = sqlx::query(query)
+        .bind(tenant_id)
+        .bind(event_name)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| format!("DB Error: {}", e))?;
+
+    if let Some(r) = row {
+        let dag_json: Value = r.get("dag_json");
+        let dag: WorkflowDag = serde_json::from_value(dag_json)
+            .map_err(|e| format!("Invalid DAG JSON: {}", e))?;
+
+        println!("[Workflow Engine] Found active workflow for event '{}'. Triggering...", event_name);
+        
+        let runner = WorkflowRunner::new(dag);
+        // Trong hệ thống thực tế, ta nên đẩy cái này vào background task (VD: tokio::spawn)
+        // Ở đây chạy await luôn để demo.
+        match runner.execute(payload).await {
+            Ok(context) => {
+                println!("[Workflow Engine] Workflow completed successfully. Context: {:?}", context.variables.keys());
+            }
+            Err(e) => {
+                println!("[Workflow Engine] Workflow failed: {}", e);
+            }
+        }
+    } else {
+        println!("[Workflow Engine] No active workflow found for event '{}'", event_name);
+    }
+
+    Ok(())
+}
+

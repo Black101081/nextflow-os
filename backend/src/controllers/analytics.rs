@@ -103,14 +103,16 @@ pub async fn get_tenant_kpis(
 
     let avg_resolution_seconds: f64 = resolution_row.get("avg_resolution");
 
-    // 4. Lấy danh sách throughput (số lượng hoàn thành trong 24 giờ qua)
-    let throughput_query = r#"
-        SELECT COUNT(*) as count 
+    // 4. Lấy danh sách throughput (số lượng hoàn thành trong 24 giờ qua) và doanh thu
+    let throughput_query_f64 = r#"
+        SELECT 
+            COUNT(*) as count,
+            COALESCE(SUM((metadata->>'order_value')::numeric), 0)::double precision as total_revenue
         FROM nf_core.work_items 
         WHERE tenant_id = $1 AND status = 'COMPLETED' AND updated_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
     "#;
-
-    let throughput_row = sqlx::query(throughput_query)
+    
+    let throughput_row_f64 = sqlx::query(throughput_query_f64)
         .bind(tenant.tenant_id)
         .fetch_one(&state.pool)
         .await
@@ -122,7 +124,9 @@ pub async fn get_tenant_kpis(
             )
                 .into_response()
         })?;
-    let completed_24h: i64 = throughput_row.get("count");
+
+    let completed_24h: i64 = throughput_row_f64.get("count");
+    let total_revenue: f64 = throughput_row_f64.get("total_revenue");
 
     let res = json!({
         "tenant_id": tenant.tenant_id,
@@ -133,6 +137,7 @@ pub async fn get_tenant_kpis(
             "completed_count": completed_count,
             "cancelled_count": cancelled_count,
             "completed_24h": completed_24h,
+            "total_revenue": total_revenue,
             "sla_breach_rate": (sla_breach_rate * 10.0).round() / 10.0, // làm tròn 1 chữ số thập phân
             "avg_resolution_seconds": avg_resolution_seconds.round()
         }

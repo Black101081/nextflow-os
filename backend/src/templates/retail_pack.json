@@ -1,0 +1,37 @@
+{
+  "id": "tpl_retail_standard",
+  "name": "Retail POS & Inventory Pack",
+  "description": "Hệ thống chuẩn hóa vận hành Chuỗi bán lẻ, Siêu thị mini. Tự động hóa kiểm kho, Trưng bày hàng hóa (Visual Merchandising) và quy trình Đóng ca.",
+  "category": "retail",
+  "queues": [
+    {
+      "name": "Trưng bày hàng hóa (VM)",
+      "description": "Sắp xếp kệ hàng đúng quy định trưng bày",
+      "priority": 2,
+      "color": "blue",
+      "icon": "LayoutDashboard"
+    },
+    {
+      "name": "Kiểm kê kho định kỳ",
+      "description": "Đếm số lượng thực tế so với POS",
+      "priority": 1,
+      "color": "purple",
+      "icon": "Package"
+    }
+  ],
+  "policies": [
+    {
+      "name": "SLA - Kiểm kho chốt ca",
+      "description": "Bắt buộc nhân viên đóng ca phải đếm và chốt tồn kho tiền mặt, hàng hóa trước khi về.",
+      "target_type": "completion",
+      "target_value": "100",
+      "action": "hold_salary_advance"
+    }
+  ],
+  "sops": [
+    {
+      "title": "SOP Trưng bày Cửa hàng (VM)",
+      "content": "## Nguyên tắc Trưng bày\n- Hàng mới nhập (Date xa) xếp phía trong, hàng nhập trước (Date gần) xếp phía ngoài (FIFO).\n- Mặt tiền sản phẩm (face) phải luôn hướng ra ngoài, không bị ngược chữ.\n- Nhãn giá phải đặt chính giữa mặt hàng, mép kệ."
+    }
+  ]
+}

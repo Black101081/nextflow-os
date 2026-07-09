@@ -5,6 +5,8 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
+@import "tailwindcss";
+
 :root {
   /* Font Family Tokens */
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -34,6 +36,14 @@
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.6);
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.8);
   --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.25);
+  --shadow-glow-success: 0 0 15px rgba(16, 185, 129, 0.3);
+  --shadow-glow-danger: 0 0 15px rgba(244, 63, 94, 0.3);
+
+  /* Glassmorphism Tokens */
+  --glass-bg: rgba(18, 20, 28, 0.7);
+  --glass-bg-hover: rgba(26, 29, 41, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-blur: blur(16px);
 
   --radius-sm: 6px;
   --radius-md: 12px;
@@ -461,4 +471,129 @@ body {
   font-size: 11px;
   color: var(--text-muted);
   margin-top: 4px;
+}
+
+/* Custom Scrollbar for Premium Look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-color-hover);
+}
+
+/* Glassmorphism & Neon Glow Panels */
+.panel-glass {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-md);
+  transition: all var(--transition-normal);
+}
+.panel-glass:hover {
+  border-color: rgba(99, 102, 241, 0.25);
+  box-shadow: var(--shadow-lg), var(--shadow-glow);
+}
+
+/* Modern High-density Tables (MISA AMIS inspired) */
+.data-table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.data-table th {
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-main);
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tr:hover td {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* Chat bubble styling for OmniChannel Chat */
+.chat-bubble {
+  max-width: 70%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 8px;
+  display: inline-block;
+  word-break: break-word;
+}
+
+.chat-bubble-left {
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-main);
+  border-bottom-left-radius: 4px;
+  align-self: flex-start;
+  border: 1px solid var(--border-color);
+}
+
+.chat-bubble-right {
+  background-color: var(--color-primary-glow);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+  align-self: flex-end;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.chat-bubble-ai {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+  color: #e9d5ff;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.1);
+  border-bottom-left-radius: 4px;
+  align-self: flex-start;
+}
+
+/* Input styles enhancement */
+.input-premium {
+  background: rgba(11, 12, 16, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  color: var(--text-main);
+  font-size: 14px;
+  transition: all var(--transition-fast);
+}
+.input-premium:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-glow);
 }

@@ -248,6 +248,94 @@ pub async fn initialize_tenant_template(
         }
     }
 
+    // 3.1 Create Entities & Schemas
+    let entities_list = config_metadata.get("entities").and_then(|e| e.as_array());
+    if let Some(entities) = entities_list {
+        for e in entities {
+            let e_name = e.get("name").and_then(|n| n.as_str()).unwrap_or_default();
+            let e_sys = e.get("system_name").and_then(|n| n.as_str()).unwrap_or_default();
+            let e_desc = e.get("description").and_then(|n| n.as_str()).unwrap_or_default();
+            
+            // Upsert entity
+            let entity_row = sqlx::query(r#"
+                INSERT INTO nf_meta.entities (tenant_id, name, system_name, description)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (tenant_id, system_name) DO UPDATE 
+                SET name = EXCLUDED.name, description = EXCLUDED.description
+                RETURNING id
+            "#)
+            .bind(tenant.tenant_id)
+            .bind(e_name)
+            .bind(e_sys)
+            .bind(e_desc)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|err| {
+                (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": err.to_string()}))).into_response()
+            })?;
+            
+            let entity_id: Uuid = entity_row.get("id");
+
+            // Insert schema if available
+            if let Some(schema_json) = e.get("schema") {
+                sqlx::query(r#"
+                    INSERT INTO nf_meta.entity_schemas (entity_id, tenant_id, version, schema_json, is_active)
+                    VALUES ($1, $2, '1.0.0', $3, true)
+                "#)
+                .bind(entity_id)
+                .bind(tenant.tenant_id)
+                .bind(schema_json)
+                .execute(&mut *tx)
+                .await
+                .ok(); // Ignore schema duplicate errors for simplicity
+            }
+        }
+    }
+
+    // 3.2 Create Workflows
+    let workflows_list = config_metadata.get("workflows").and_then(|w| w.as_array());
+    if let Some(workflows) = workflows_list {
+        for w in workflows {
+            let w_name = w.get("name").and_then(|n| n.as_str()).unwrap_or_default();
+            let w_trigger = w.get("trigger_event").and_then(|n| n.as_str()).unwrap_or_default();
+            let w_dag = w.get("dag").cloned().unwrap_or_else(|| json!({}));
+            
+            sqlx::query(r#"
+                INSERT INTO nf_meta.workflow_definitions (tenant_id, name, trigger_event, dag_json, is_active)
+                VALUES ($1, $2, $3, $4, true)
+            "#)
+            .bind(tenant.tenant_id)
+            .bind(w_name)
+            .bind(w_trigger)
+            .bind(w_dag)
+            .execute(&mut *tx)
+            .await
+            .ok(); 
+        }
+    }
+
+    // 3.3 Create Connectors
+    let connectors_list = config_metadata.get("connectors").and_then(|c| c.as_array());
+    if let Some(connectors) = connectors_list {
+        for c in connectors {
+            let c_name = c.get("name").and_then(|n| n.as_str()).unwrap_or_default();
+            let c_settings = c.get("settings").cloned().unwrap_or_else(|| json!({}));
+            
+            sqlx::query(r#"
+                INSERT INTO nf_core.connector_configurations (tenant_id, connector_name, status, settings)
+                VALUES ($1, $2, 'ACTIVE', $3)
+                ON CONFLICT (tenant_id, connector_name) DO UPDATE 
+                SET settings = EXCLUDED.settings, status = 'ACTIVE'
+            "#)
+            .bind(tenant.tenant_id)
+            .bind(c_name)
+            .bind(c_settings)
+            .execute(&mut *tx)
+            .await
+            .ok(); 
+        }
+    }
+
     // 4. Upsert default tenant policies
     sqlx::query(r#"
         INSERT INTO nf_core.tenant_policies (tenant_id, sla_minutes_default, sla_minutes_high, auto_assignment_enabled, routing_mode)
@@ -262,7 +350,19 @@ pub async fn initialize_tenant_template(
     })?;
 
     // 5. Seed some realistic demo tasks based on template
-    if payload.template_id == "retail_distribution" {
+    if payload.template_id == "tpl_retail_pro_001" {
+        // Task 1: KiotViet Sync Order
+        sqlx::query(r#"
+            INSERT INTO nf_core.work_items (tenant_id, queue_id, title, priority, status, category, due_at, metadata)
+            VALUES ($1, 'q_kiotviet_orders', 'Đơn hàng mới #KV1002 từ KiotViet', 'HIGH', 'UNASSIGNED', 'OPERATIONS', CURRENT_TIMESTAMP + INTERVAL '30 minutes', '{"branch_id": "HQ", "customer_name": "Nguyễn Văn A", "order_value": 1500000}')
+        "#)
+        .bind(tenant.tenant_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response()
+        })?;
+    } else if payload.template_id == "retail_distribution" {
         // Task 1: Order Processing (District 1)
         sqlx::query(r#"
             INSERT INTO nf_core.work_items (tenant_id, queue_id, title, priority, status, category, due_at, metadata)
@@ -906,4 +1006,212 @@ pub async fn delete_tenant_user(
         "message": "Xoá nhân sự khỏi hệ thống thành công."
     })))
 }
+
+/// Nạp dữ liệu demo cho Tenant
+pub async fn seed_demo_data(
+    State(state): State<AppState>,
+    tenant: TenantIsolation,
+) -> Result<impl IntoResponse, Response> {
+    let pool = state.pool;
+    let tenant_id = tenant.tenant_id;
+
+    // 1. Tạo Entity 'kiotviet_order' nếu chưa có
+    let mut entity_id = Uuid::new_v4();
+    let mut schema_version_id = Uuid::new_v4();
+
+    let existing_entity = sqlx::query("SELECT id FROM nf_meta.entities WHERE tenant_id = $1 AND system_name = 'kiotviet_order'")
+        .bind(tenant_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+
+    if let Some(r) = existing_entity {
+        entity_id = r.get("id");
+        let existing_schema = sqlx::query("SELECT id FROM nf_meta.entity_schemas WHERE entity_id = $1 AND is_active = true LIMIT 1")
+            .bind(entity_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+        if let Some(s) = existing_schema {
+            schema_version_id = s.get("id");
+        }
+    } else {
+        // Insert Entity
+        sqlx::query(
+            "INSERT INTO nf_meta.entities (id, tenant_id, name, system_name, description) VALUES ($1, $2, $3, $4, $5)"
+        )
+        .bind(entity_id)
+        .bind(tenant_id)
+        .bind("Đơn Hàng KiotViet")
+        .bind("kiotviet_order")
+        .bind("Đồng bộ đơn hàng từ KiotViet")
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+
+        // Insert Schema
+        let schema_json = json!({
+            "type": "object",
+            "properties": {
+                "Code": { "type": "string", "title": "Mã đơn hàng" },
+                "StatusName": { "type": "string", "title": "Trạng thái" },
+                "Total": { "type": "number", "title": "Tổng tiền" },
+                "CustomerName": { "type": "string", "title": "Khách hàng" }
+            },
+            "required": ["Code", "Total"]
+        });
+        sqlx::query(
+            "INSERT INTO nf_meta.entity_schemas (id, entity_id, tenant_id, version, schema_json, is_active) VALUES ($1, $2, $3, 1, $4, true)"
+        )
+        .bind(schema_version_id)
+        .bind(entity_id)
+        .bind(tenant_id)
+        .bind(schema_json)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+    }
+
+    // 2. Clear old demo records
+    sqlx::query("DELETE FROM nf_meta.entity_records WHERE tenant_id = $1 AND entity_id = $2")
+        .bind(tenant_id)
+        .bind(entity_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+
+    // 3. Seed new records
+    let mock_records = vec![
+        json!({ "Code": "DH000921", "StatusName": "Phiếu tạm", "Total": 450000, "CustomerName": "Nguyễn Thị Lan Anh" }),
+        json!({ "Code": "DH000922", "StatusName": "Đang giao dịch", "Total": 350000, "CustomerName": "Trần Thị B" }),
+        json!({ "Code": "DH000923", "StatusName": "Hoàn thành", "Total": 1200000, "CustomerName": "Lê C" }),
+    ];
+
+    for r in mock_records {
+        sqlx::query(
+            "INSERT INTO nf_meta.entity_records (tenant_id, entity_id, schema_version_id, data) VALUES ($1, $2, $3, $4)"
+        )
+        .bind(tenant_id)
+        .bind(entity_id)
+        .bind(schema_version_id)
+        .bind(r)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+    }
+
+    // 4. Seed chat conversations
+    sqlx::query("DELETE FROM nf_core.chat_conversations WHERE tenant_id = $1")
+        .bind(tenant_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+
+    let conv_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO nf_core.chat_conversations (id, tenant_id, status, customer_id) VALUES ($1, $2, 'OPEN', 'cust_lan_anh')"
+    )
+    .bind(conv_id)
+    .bind(tenant_id)
+    .execute(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+
+    let messages = vec![
+        ("CUSTOMER", "Chào shop, đơn hàng DH000921 của mình bao giờ giao thế?", Utc::now() - chrono::Duration::minutes(15)),
+        ("AI", "Chào chị Lan Anh, đơn hàng DH000921 đang trong trạng thái 'Phiếu tạm' và dự kiến giao cho đơn vị GHTK trong chiều nay ạ.", Utc::now() - chrono::Duration::minutes(14)),
+        ("CUSTOMER", "Cảm ơn em nhé!", Utc::now() - chrono::Duration::minutes(10)),
+    ];
+
+    for (sender, content, created) in messages {
+        sqlx::query(
+            "INSERT INTO nf_core.chat_messages (conversation_id, sender_type, sender_id, content, created_at) VALUES ($1, $2, $3, $4, $5)"
+        )
+        .bind(conv_id)
+        .bind(sender)
+        .bind(if sender == "CUSTOMER" { "cust_lan_anh" } else { "ai_agent" })
+        .bind(content)
+        .bind(created)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+    }
+
+    // 4.5. Seed Work Items
+    sqlx::query("DELETE FROM nf_core.work_items WHERE tenant_id = $1")
+        .bind(tenant_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+
+    sqlx::query("DELETE FROM nf_core.invoices WHERE tenant_id = $1")
+        .bind(tenant_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+
+    let mock_tasks = vec![
+        ("Xử lý đơn hàng DH000921 (KiotViet)", "Đơn hàng trễ hạn giao - Liên hệ GHTK hỏa tốc.", "HIGH", "UNASSIGNED"),
+        ("Kiểm tra chất lượng vệ sinh ca sáng", "Checklist QA/QC khu vực bếp và phục vụ.", "MEDIUM", "IN_PROGRESS"),
+        ("Phê duyệt hoàn trả đơn DH000923", "Khách trả hàng lỗi sản xuất.", "LOW", "COMPLETED"),
+    ];
+
+    let mut task_ids = Vec::new();
+    for (title, desc, priority, status) in mock_tasks {
+        let row = sqlx::query(
+            "INSERT INTO nf_core.work_items (tenant_id, title, description, priority, status) VALUES ($1, $2, $3, $4, $5) RETURNING id"
+        )
+        .bind(tenant_id)
+        .bind(title)
+        .bind(desc)
+        .bind(priority)
+        .bind(status)
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+
+        let id: Uuid = row.get("id");
+        task_ids.push(id);
+    }
+
+    if let Some(&first_task_id) = task_ids.first() {
+        let invoice_id = Uuid::new_v4();
+        let vietqr_url = "https://img.vietqr.io/image/970415-1133557799-compact2.png?amount=450000&addInfo=DH000921&accountName=NextFlow%20OS%20Demo";
+
+        sqlx::query(
+            "INSERT INTO nf_core.invoices (id, tenant_id, work_item_id, amount, currency, status, vietqr_string) VALUES ($1, $2, $3, $4, $5, $6, $7)"
+        )
+        .bind(invoice_id)
+        .bind(tenant_id)
+        .bind(first_task_id)
+        .bind(450000.0)
+        .bind("VND")
+        .bind("UNPAID")
+        .bind(vietqr_url)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+    }
+
+    // 5. Update Tenant KPI daily reports mock
+    sqlx::query("DELETE FROM nf_analytics.daily_performance_reports WHERE tenant_id = $1")
+        .bind(tenant_id)
+        .execute(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+
+    sqlx::query(
+        "INSERT INTO nf_analytics.daily_performance_reports (tenant_id, report_date, total_tasks, completed_tasks, avg_resolution_seconds, total_revenue, sla_breaches) VALUES ($1, CURRENT_DATE, 15, 12, 480, 2000000.0, 1)"
+    )
+    .bind(tenant_id)
+    .execute(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response())?;
+
+    Ok(Json(json!({
+        "status": "SUCCESS",
+        "message": "Nạp dữ liệu mẫu cho Workspace thành công!"
+    })))
+}
+
 

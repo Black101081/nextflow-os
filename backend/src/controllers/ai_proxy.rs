@@ -267,3 +267,58 @@ pub async fn ai_health_check() -> impl IntoResponse {
         Err(e) => Json(json!({"ai_service": "DOWN", "reason": e.to_string()})),
     }
 }
+
+#[derive(Debug, Deserialize)]
+pub struct GenerateWorkflowRequest {
+    pub prompt: String,
+}
+
+pub async fn generate_workflow(
+    State(_state): State<AppState>,
+    _tenant: TenantIsolation,
+    Json(req): Json<GenerateWorkflowRequest>,
+) -> Result<impl IntoResponse, Response> {
+    println!("[AI Proxy] Generating workflow for prompt: {}", req.prompt);
+
+    let mock_nodes = vec![
+        json!({ "id": "start", "position": { "x": 250, "y": 50 }, "data": { "label": "Bắt đầu" } }),
+        json!({ "id": "zalo", "position": { "x": 250, "y": 150 }, "data": { "label": "Gửi tin Zalo OA" } }),
+        json!({ "id": "shipping", "position": { "x": 100, "y": 250 }, "data": { "label": "GHTK" } }),
+        json!({ "id": "payment", "position": { "x": 400, "y": 250 }, "data": { "label": "VietQR" } }),
+        json!({ "id": "end", "position": { "x": 250, "y": 350 }, "data": { "label": "Hoàn thành" } }),
+    ];
+
+    let mock_edges = vec![
+        json!({ "id": "e1", "source": "start", "target": "zalo" }),
+        json!({ "id": "e2", "source": "zalo", "target": "shipping" }),
+        json!({ "id": "e3", "source": "zalo", "target": "payment" }),
+        json!({ "id": "e4", "source": "shipping", "target": "end" }),
+        json!({ "id": "e5", "source": "payment", "target": "end" }),
+    ];
+
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+    Ok(Json(json!({
+        "nodes": mock_nodes,
+        "edges": mock_edges,
+        "message": "AI đã tạo quy trình thành công!"
+    })))
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ExtractInvoiceRequest {
+    pub text: String,
+}
+
+pub async fn ai_extract_invoice(
+    State(_state): State<AppState>,
+    tenant: TenantIsolation,
+    Json(req): Json<ExtractInvoiceRequest>,
+) -> Result<impl IntoResponse, Response> {
+    let body = serde_json::to_value(&req).map_err(|e| {
+        (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response()
+    })?;
+
+    let result = proxy_to_ai("extract-invoice", body, tenant.tenant_id).await?;
+    Ok(Json(result))
+}

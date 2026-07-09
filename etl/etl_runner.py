@@ -92,21 +92,32 @@ def process_batch(conn, events: list[dict]) -> tuple[int, int]:
     with conn.cursor() as cur:
         for record in valid_records:
             try:
-                handling_time = compute_handling_time(
-                    record.get("started_at"), record.get("completed_at")
-                )
-                queue_wait_time = compute_queue_wait_time(
-                    record.get("created_at"), record.get("started_at")
-                )
-                sla_violated = is_sla_violated(
-                    record.get("due_at"), record.get("completed_at")
-                )
-                is_completed = record.get("status") in ("COMPLETED", "DONE")
+                record_data = record.get("record_data", {})
+                
+                started_at = record.get("started_at") or record_data.get("started_at")
+                completed_at = record.get("completed_at") or record_data.get("completed_at")
+                created_at = record.get("created_at") or record_data.get("created_at")
+                due_at = record.get("due_at") or record_data.get("due_at")
+
+                handling_time = compute_handling_time(started_at, completed_at)
+                queue_wait_time = compute_queue_wait_time(created_at, started_at)
+                sla_violated = is_sla_violated(due_at, completed_at)
+                
+                status = record.get("status") or record_data.get("status") or "UNASSIGNED"
+                is_completed = status in ("COMPLETED", "DONE")
 
                 # Chuyển đổi priority CRITICAL -> CRITICAL (giữ nguyên nếu valid)
-                priority = record.get("priority", "MEDIUM").upper()
+                priority = str(record.get("priority") or record_data.get("priority") or "MEDIUM").upper()
                 if priority not in ("LOW", "MEDIUM", "HIGH", "CRITICAL"):
                     priority = "MEDIUM"
+                
+                title = record.get("title") or record_data.get("title") or "Dynamic Entity Record"
+                category = record.get("category") or record_data.get("category") or "GENERAL"
+                source = record.get("source") or record_data.get("source") or "MANUAL"
+                creator_id = record.get("creator_id") or record_data.get("creator_id")
+                assignee_id = record.get("assignee_id") or record_data.get("assignee_id")
+                queue_id = record.get("queue_id") or record_data.get("queue_id")
+
 
                 cur.execute("""
                     INSERT INTO nf_analytics.fact_work_item_lifecycle (
@@ -133,20 +144,20 @@ def process_batch(conn, events: list[dict]) -> tuple[int, int]:
                         version                 = EXCLUDED.version,
                         last_synced_at          = CURRENT_TIMESTAMP
                 """, {
-                    "id":               record.get("id"),
+                    "id":               record.get("id") or record.get("work_item_id"),
                     "tenant_id":        record.get("tenant_id"),
-                    "title":            record.get("title", ""),
-                    "category":         record.get("category", "GENERAL"),
+                    "title":            title,
+                    "category":         category,
                     "priority":         priority,
-                    "source":           record.get("source", "MANUAL"),
-                    "status":           record.get("status", "UNASSIGNED"),
-                    "creator_id":       record.get("creator_id"),
-                    "assignee_id":      record.get("assignee_id"),
-                    "queue_id":         record.get("queue_id"),
-                    "created_at":       record.get("created_at"),
-                    "due_at":           record.get("due_at"),
-                    "started_at":       record.get("started_at"),
-                    "completed_at":     record.get("completed_at"),
+                    "source":           source,
+                    "status":           status,
+                    "creator_id":       creator_id,
+                    "assignee_id":      assignee_id,
+                    "queue_id":         queue_id,
+                    "created_at":       created_at,
+                    "due_at":           due_at,
+                    "started_at":       started_at,
+                    "completed_at":     completed_at,
                     "handling_time":    handling_time,
                     "queue_wait_time":  queue_wait_time,
                     "is_completed":     is_completed,

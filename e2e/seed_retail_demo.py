@@ -162,9 +162,35 @@ for e in emps:
     cur.execute("INSERT INTO nf_meta.entity_records (tenant_id, entity_id, schema_version_id, data) VALUES (%s, %s, %s, %s)", 
                 (tenant_id, e_eid, e_sid, json.dumps(e)))
 
+print(f"\n🎉 HOÀN TẤT! Đã bơm thành công: 3 Chi nhánh, 50 Sản phẩm, 5 Nhân viên.")
+
+# 4. Bơm cấu hình Workflow DAG cho Retail
+print("\n🔄 Đang bơm cấu hình Workflow DAG cho Retail...")
+workflow_dag = {
+    "nodes": [
+        {"id": "node_1", "type": "StartEvent", "label": "Khách mua hàng online"},
+        {"id": "node_2", "type": "Condition", "label": "Kiểm tra tồn kho"},
+        {"id": "node_3", "type": "Task", "label": "Tạo Task đóng gói (Thủ kho)", "assignee": "role:Warehouse"},
+        {"id": "node_4", "type": "AiPredict", "label": "AI Tối ưu tuyến đường giao hàng"},
+        {"id": "node_5", "type": "Task", "label": "Giao hàng (Shipper)", "assignee": "role:Shipper"},
+        {"id": "node_6", "type": "BlockchainAnchor", "label": "Ghi nhận thanh toán & Hoàn tất"}
+    ],
+    "edges": [
+        {"from": "node_1", "to": "node_2"},
+        {"from": "node_2", "to": "node_3", "condition": "stock > 0"},
+        {"from": "node_3", "to": "node_4"},
+        {"from": "node_4", "to": "node_5"},
+        {"from": "node_5", "to": "node_6"}
+    ]
+}
+
+cur.execute("""
+    INSERT INTO nf_meta.workflow_definitions (tenant_id, name, trigger_event, dag_json)
+    VALUES (%s, %s, %s, %s)
+""", (tenant_id, "Quy trình Bán lẻ Tự động", "order.created", json.dumps(workflow_dag)))
+
 conn.commit()
 cur.close()
 conn.close()
 
-print(f"\n🎉 HOÀN TẤT! Đã bơm thành công: 3 Chi nhánh, 50 Sản phẩm, 5 Nhân viên.")
-print("   Sản phẩm Retail Pack đã sẵn sàng để demo!")
+print("   Sản phẩm Retail Pack và Workflow DAG đã sẵn sàng để demo!")

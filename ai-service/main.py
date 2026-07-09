@@ -221,6 +221,76 @@ async def sla_risk_batch(req: BatchSlaRiskRequest):
     return {"results": results, "count": len(results)}
 
 
+class ExtractInvoiceRequest(BaseModel):
+    text: str
+
+@app.post("/extract-invoice")
+async def extract_invoice_endpoint(req: ExtractInvoiceRequest):
+    """Trích xuất thông tin hóa đơn tự động bằng AI hoặc Regex Fallback."""
+    text = req.text
+    amount = 0.0
+    vendor = "Nhà cung cấp chưa rõ"
+    due_date = None
+    items = []
+    
+    import re
+    import json
+    
+    amount_match = re.search(r'(?:tổng tiền|thành tiền|tổng thanh toán|cộng|số tiền|amount)[:\s]+([\d.,]+)\s*(?:đ|vnd|đồng|vnđ)?', text, re.IGNORECASE)
+    if amount_match:
+        raw_val = amount_match.group(1).replace('.', '').replace(',', '')
+        try:
+            amount = float(raw_val)
+        except ValueError:
+            pass
+            
+    vendor_match = re.search(r'(?:công ty|cty|doanh nghiệp|nhà cung cấp|đơn vị bán)[:\s]+([^\n\r]+)', text, re.IGNORECASE)
+    if vendor_match:
+        vendor = vendor_match.group(1).strip()
+        
+    date_match = re.search(r'(?:hạn thanh toán|due date|hạn nợ|ngày thanh toán)[:\s]+([\d/\-]+)', text, re.IGNORECASE)
+    if date_match:
+        due_date = date_match.group(1).strip()
+
+    if _gemini_client:
+        try:
+            prompt = f"""
+            Bạn là chuyên gia kế toán. Hãy trích xuất thông tin hóa đơn sau dưới dạng JSON có các trường:
+            - "vendor": Tên đơn vị bán / nhà cung cấp
+            - "amount": Tổng số tiền thanh toán (chỉ lấy số float, ví dụ 5000000.0)
+            - "due_date": Hạn thanh toán (định dạng YYYY-MM-DD)
+            - "items": Danh sách tên các mặt hàng/dịch vụ (mảng chuỗi)
+
+            Nội dung hóa đơn:
+            {text}
+            
+            Chỉ trả về JSON hợp lệ, không kèm giải thích hay tag markdown ```json.
+            """
+            response = _gemini_client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=prompt,
+            )
+            cleaned_text = response.text.replace("```json", "").replace("```", "").strip()
+            parsed = json.loads(cleaned_text)
+            return {
+                "vendor": parsed.get("vendor", vendor),
+                "amount": float(parsed.get("amount", amount)),
+                "due_date": parsed.get("due_date", due_date),
+                "items": parsed.get("items", items),
+                "method": "gemini-ai"
+            }
+        except Exception as e:
+            print(f"[AI Service] Gemini extraction failed, fallback to regex: {e}")
+
+    return {
+        "vendor": vendor,
+        "amount": amount,
+        "due_date": due_date,
+        "items": items if items else ["Dịch vụ/Mặt hàng tổng hợp"],
+        "method": "regex-fallback"
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=False)

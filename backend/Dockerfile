@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/li
 # Copy mã nguồn
 COPY . .
 
+# Khai báo build-arg DATABASE_URL để SQLx check query lúc build
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+
 # Build dự án ở chế độ Release
 # Lưu ý: Ta đổi target directory để tránh xung đột với cấu hình target local của Windows
 RUN cargo build --release --target-dir /app/target

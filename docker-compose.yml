@@ -24,6 +24,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        - DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5435/nextflow_db
     container_name: nextflow-rust-backend
     environment:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/nextflow_db

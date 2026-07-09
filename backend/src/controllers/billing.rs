@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{State, Path},
     response::IntoResponse,
     Json,
 };
@@ -35,22 +35,18 @@ pub struct InvoiceResponse {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Deserialize)]
-pub struct StripeWebhookPayload {
-    pub type_field: String, // e.g., "checkout.session.completed"
-    pub data: StripeWebhookData,
+#[derive(Deserialize, Serialize)]
+pub struct VietQRWebhookPayload {
+    pub gateway: String,
+    pub transaction_id: String,
+    pub amount: f64,
+    pub transfer_content: String,
 }
 
 #[derive(Deserialize)]
-pub struct StripeWebhookData {
-    pub object: StripeWebhookObject,
-}
-
-#[derive(Deserialize)]
-pub struct StripeWebhookObject {
-    pub client_reference_id: Option<String>, // Dùng để map với invoice_id
-    pub payment_intent: Option<String>,
-    pub amount_total: Option<i64>,
+pub struct CryptoVerifyPayload {
+    pub invoice_id: Uuid,
+    pub tx_hash: String,
 }
 
 // --- Handlers ---
@@ -70,21 +66,30 @@ pub async fn create_invoice(
 
     let tenant_id = tenant.tenant_id;
 
-    // 2. Giả lập tích hợp Stripe API để sinh Payment Link
-    let mock_payment_link = format!("https://checkout.stripe.com/pay/cs_test_{}", Uuid::new_v4());
-    let mock_stripe_invoice_id = format!("in_{}", Uuid::new_v4());
+    // 2. Generate VietQR details
+    // In production, these should be configured per tenant. For MVP, we hardcode.
+    let mock_bank_bin = "970415"; // VietinBank
+    let mock_bank_account = "113366668888";
+    let mock_account_name = "NEXTFLOW OS";
+
+    let invoice_id = Uuid::new_v4();
+    let transfer_content = format!("NF{}", invoice_id.to_string().replace("-", "").chars().take(8).collect::<String>().to_uppercase());
+    
+    let vietqr_url = format!(
+        "https://img.vietqr.io/image/{}-{}-compact2.jpg?amount={}&addInfo={}&accountName={}",
+        mock_bank_bin, mock_bank_account, payload.amount, transfer_content, mock_account_name
+    );
 
     // 2.1 Sinh mã Blockchain Trust Layer
-    let invoice_id = Uuid::new_v4();
-    let data_hash = compute_invoice_data_hash(invoice_id, payload.amount, "USD", "UNPAID");
+    let data_hash = compute_invoice_data_hash(invoice_id, payload.amount, "VND", "UNPAID");
     let tx_hash = anchor_data_on_chain(&data_hash).await;
 
     // 3. Insert vào DB
     let result = sqlx::query(
         r#"
-        INSERT INTO nf_core.invoices (id, tenant_id, work_item_id, amount, status, due_date, payment_link_url, stripe_invoice_id, data_hash, tx_hash)
-        VALUES ($1, $2, $3, $4, 'UNPAID', $5, $6, $7, $8, $9)
-        RETURNING id, work_item_id, amount::FLOAT, currency, status, payment_link_url, due_date, created_at
+        INSERT INTO nf_core.invoices (id, tenant_id, work_item_id, amount, currency, status, due_date, vietqr_string, bank_bin, bank_account, transfer_content, data_hash, tx_hash)
+        VALUES ($1, $2, $3, $4, 'VND', 'UNPAID', $5, $6, $7, $8, $9, $10, $11)
+        RETURNING id, work_item_id, amount::FLOAT, currency, status, vietqr_string, due_date, created_at
         "#
     )
     .bind(invoice_id)
@@ -92,8 +97,10 @@ pub async fn create_invoice(
     .bind(payload.work_item_id)
     .bind(payload.amount)
     .bind(payload.due_date)
-    .bind(&mock_payment_link)
-    .bind(&mock_stripe_invoice_id)
+    .bind(&vietqr_url)
+    .bind(mock_bank_bin)
+    .bind(mock_bank_account)
+    .bind(&transfer_content)
     .bind(&data_hash)
     .bind(&tx_hash)
     .fetch_one(&state.pool)
@@ -107,7 +114,7 @@ pub async fn create_invoice(
                 amount: record.get::<f64, _>("amount"),
                 currency: record.get("currency"),
                 status: record.get("status"),
-                payment_link_url: record.get("payment_link_url"),
+                payment_link_url: record.get("vietqr_string"), // Trả về QR ảnh thay cho Stripe link
                 due_date: record.get("due_date"),
                 created_at: record.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at").unwrap_or_default(),
             };
@@ -141,7 +148,7 @@ pub async fn get_invoices(
     // 2. Query từ CSDL
     let records = sqlx::query(
         r#"
-        SELECT id, work_item_id, amount::FLOAT as amount, currency, status, payment_link_url, due_date, created_at
+        SELECT id, work_item_id, amount::FLOAT as amount, currency, status, vietqr_string as payment_link_url, due_date, created_at, data_hash, tx_hash
         FROM nf_core.invoices
         WHERE tenant_id = $1
         ORDER BY created_at DESC
@@ -163,7 +170,9 @@ pub async fn get_invoices(
                     "status": r.get::<String, _>("status"),
                     "payment_link_url": r.get::<Option<String>, _>("payment_link_url"),
                     "due_date": r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("due_date"),
-                    "created_at": r.get::<chrono::DateTime<chrono::Utc>, _>("created_at"),
+                    "created_at": r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at").unwrap_or_default(),
+                    "data_hash": r.get::<Option<String>, _>("data_hash"),
+                    "tx_hash": r.get::<Option<String>, _>("tx_hash"),
                 }));
             }
             Json(json!({ "invoices": invoices })).into_response()
@@ -180,71 +189,179 @@ pub async fn get_invoices(
     }
 }
 
-/// POST /api/v1/billing/webhooks/stripe
-/// Endpoint Public: Không nhận Auth Header
-/// Nhận sự kiện từ Stripe khi khách hàng thanh toán thành công
-pub async fn stripe_webhook(
+/// POST /api/v1/billing/webhooks/vietqr
+/// Endpoint Public: Nhận webhook từ Open API ngân hàng hoặc SeAMin khi tiền vào tài khoản
+pub async fn vietqr_webhook(
     State(state): State<AppState>,
-    // Trong môi trường thật, cần nhận raw body và Stripe-Signature để verify. Ở đây ta dùng JSON thẳng cho MVP.
-    Json(payload): Json<serde_json::Value>, 
+    Json(payload): Json<VietQRWebhookPayload>, 
 ) -> impl IntoResponse {
-    // Ép kiểu một phần
-    let type_field = payload.get("type").and_then(|v| v.as_str()).unwrap_or("");
     
-    if type_field == "checkout.session.completed" {
-        if let Some(obj) = payload.get("data").and_then(|d| d.get("object")) {
-            if let Some(client_ref) = obj.get("client_reference_id").and_then(|c| c.as_str()) {
-                if let Ok(invoice_id) = Uuid::parse_str(client_ref) {
-                    
-                    let payment_intent = obj.get("payment_intent").and_then(|pi| pi.as_str()).unwrap_or("unknown");
-                    let amount_total = obj.get("amount_total").and_then(|a| a.as_f64()).unwrap_or(0.0) / 100.0;
+    // Tìm hóa đơn dựa trên nội dung chuyển khoản (transfer_content)
+    let inv_row = sqlx::query("SELECT id, amount::FLOAT FROM nf_core.invoices WHERE transfer_content = $1 AND status = 'UNPAID'")
+        .bind(&payload.transfer_content)
+        .fetch_optional(&state.pool)
+        .await;
 
-                    // 1. Sinh mã băm Blockchain mới cho trạng thái PAID
-                    let new_data_hash = compute_invoice_data_hash(invoice_id, amount_total, "USD", "PAID");
-                    let new_tx_hash = anchor_data_on_chain(&new_data_hash).await;
+    if let Ok(Some(row)) = inv_row {
+        let invoice_id: Uuid = row.get("id");
+        let expected_amount: f64 = row.get("amount");
 
-                    // 2. Cập nhật Invoices -> PAID và lưu trữ mã Hash mới
-                    let inv_result = sqlx::query(
-                        "UPDATE nf_core.invoices SET status = 'PAID', data_hash = $2, tx_hash = $3 WHERE id = $1 RETURNING tenant_id"
-                    )
-                    .bind(invoice_id)
-                    .bind(&new_data_hash)
-                    .bind(&new_tx_hash)
-                    .fetch_one(&state.pool)
-                    .await;
+        if payload.amount >= expected_amount {
+            // 1. Sinh mã băm Blockchain mới cho trạng thái PAID
+            let new_data_hash = compute_invoice_data_hash(invoice_id, payload.amount, "VND", "PAID");
+            let new_tx_hash = anchor_data_on_chain(&new_data_hash).await;
 
-                    if let Ok(record) = inv_result {
-                        let tenant_id: Uuid = record.get("tenant_id");
-                        crate::services::webhook_dispatcher::dispatch_event(
-                            &state.pool,
-                            tenant_id,
-                            "INVOICE_PAID",
-                            serde_json::json!({
-                                "invoice_id": invoice_id,
-                                "amount_total": amount_total,
-                                "status": "PAID",
-                                "tx_hash": new_tx_hash
-                            }),
-                        ).await;
-                    }
+            // 2. Cập nhật Invoices -> PAID và lưu trữ mã Hash mới
+            let inv_result = sqlx::query(
+                "UPDATE nf_core.invoices SET status = 'PAID', data_hash = $2, tx_hash = $3 WHERE id = $1 RETURNING tenant_id"
+            )
+            .bind(invoice_id)
+            .bind(&new_data_hash)
+            .bind(&new_tx_hash)
+            .fetch_one(&state.pool)
+            .await;
 
-                    // 2. Lưu vào Transactions
-                    let _ = sqlx::query(
-                        r#"
-                        INSERT INTO nf_core.transactions (invoice_id, gateway, gateway_transaction_id, amount, status, raw_payload)
-                        VALUES ($1, 'stripe', $2, $3, 'succeeded', $4)
-                        "#
-                    )
-                    .bind(invoice_id)
-                    .bind(&payment_intent)
-                    .bind(amount_total)
-                    .bind(&payload)
-                    .execute(&state.pool).await;
-                }
+            if let Ok(record) = inv_result {
+                let tenant_id: Uuid = record.get("tenant_id");
+                crate::services::webhook_dispatcher::dispatch_event(
+                    &state.pool,
+                    tenant_id,
+                    "INVOICE_PAID",
+                    serde_json::json!({
+                        "invoice_id": invoice_id,
+                        "amount_total": payload.amount,
+                        "status": "PAID",
+                        "tx_hash": new_tx_hash
+                    }),
+                ).await;
             }
+
+            // 3. Lưu vào Transactions
+            let _ = sqlx::query(
+                r#"
+                INSERT INTO nf_core.transactions (invoice_id, gateway, gateway_transaction_id, amount, status, raw_payload)
+                VALUES ($1, 'vietqr', $2, $3, 'succeeded', $4)
+                "#
+            )
+            .bind(invoice_id)
+            .bind(&payload.transaction_id)
+            .bind(payload.amount)
+            .bind(serde_json::json!(&payload))
+            .execute(&state.pool).await;
         }
     }
 
-    // Luôn trả về 200 OK cho Webhook provider
     (axum::http::StatusCode::OK, "Webhook received").into_response()
+}
+
+/// POST /api/v1/billing/crypto/verify
+pub async fn verify_crypto_payment(
+    State(state): State<AppState>,
+    Json(payload): Json<CryptoVerifyPayload>,
+) -> impl IntoResponse {
+    // Giả lập verify on-chain
+    // Trong thực tế, chúng ta sẽ gọi API của blockchain explorer (e.g. U2U Explorer) 
+    // để kiểm tra xem tx_hash có hợp lệ và chuyển đúng số tiền vào ví của SME chưa.
+    
+    // Đánh dấu hóa đơn là PAID và lưu lại tx_hash của blockchain
+    let result = sqlx::query(
+        r#"
+        UPDATE nf_core.invoices
+        SET status = 'PAID', tx_hash = $1
+        WHERE id = $2 AND status = 'UNPAID'
+        RETURNING id
+        "#
+    )
+    .bind(&payload.tx_hash)
+    .bind(payload.invoice_id)
+    .fetch_optional(&state.pool)
+    .await;
+
+    match result {
+        Ok(Some(_)) => {
+            (axum::http::StatusCode::OK, Json(json!({ "message": "Xác minh Web3 thành công, thanh toán đã được ghi nhận." }))).into_response()
+        }
+        Ok(None) => {
+            (axum::http::StatusCode::BAD_REQUEST, Json(json!({ "error": "Hóa đơn không tồn tại hoặc đã được thanh toán trước đó." }))).into_response()
+        }
+        Err(e) => {
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Lỗi hệ thống: {}", e) }))).into_response()
+        }
+    }
+}
+
+/// GET /api/v1/billing/invoices/:id/verify-integrity
+pub async fn verify_invoice_integrity(
+    State(state): State<AppState>,
+    Path(invoice_id): Path<Uuid>,
+) -> impl IntoResponse {
+    let query_res = sqlx::query(
+        r#"
+        SELECT id, amount::FLOAT, currency, status, data_hash, tx_hash
+        FROM nf_core.invoices
+        WHERE id = $1
+        "#
+    )
+    .bind(invoice_id)
+    .fetch_optional(&state.pool)
+    .await;
+
+    match query_res {
+        Ok(Some(row)) => {
+            let amount: f64 = row.get("amount");
+            let currency: String = row.get("currency");
+            let status: String = row.get("status");
+            let data_hash_db: Option<String> = row.get("data_hash");
+            let tx_hash_db: Option<String> = row.get("tx_hash");
+
+            let expected_hash = compute_invoice_data_hash(invoice_id, amount, &currency, &status);
+
+            let mut status_result = "VERIFIED";
+            let mut matches = true;
+
+            if let Some(db_hash) = data_hash_db.clone() {
+                if db_hash != expected_hash {
+                    status_result = "TAMPERED";
+                    matches = false;
+                    println!(
+                        "[Blockchain Tamper Alert] Hash mismatch! Invoice ID: {}. DB Hash: {}, Computed expected hash: {}",
+                        invoice_id, db_hash, expected_hash
+                    );
+                }
+            } else {
+                status_result = "UNANCHORED";
+                matches = false;
+            }
+
+            (
+                axum::http::StatusCode::OK,
+                Json(json!({
+                    "invoice_id": invoice_id,
+                    "db_hash": data_hash_db,
+                    "expected_hash": expected_hash,
+                    "tx_hash": tx_hash_db,
+                    "matches": matches,
+                    "status": status_result,
+                    "message": if matches {
+                        "Xác thực toàn vẹn thành công: Dữ liệu CSDL khớp hoàn toàn với bảo chứng Blockchain."
+                    } else if status_result == "TAMPERED" {
+                        "CẢNH BÁO GIẢ MẠO: Dữ liệu hóa đơn trong CSDL đã bị sửa đổi trái phép!"
+                    } else {
+                        "Hóa đơn chưa được neo giữ dữ liệu trên chuỗi khối."
+                    }
+                })),
+            )
+                .into_response()
+        }
+        Ok(None) => (
+            axum::http::StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Không tìm thấy hóa đơn cần xác thực." })),
+        )
+            .into_response(),
+        Err(e) => (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("Lỗi truy vấn CSDL: {}", e) })),
+        )
+            .into_response(),
+    }
 }
