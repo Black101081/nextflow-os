@@ -49,6 +49,11 @@ use crate::controllers::{
         get_security_threats, get_security_access_logs, get_compliance_report,
         get_revenue_mrr, get_revenue_cohorts, get_revenue_forecasts
     },
+    extra_ai::{
+        ai_cashflow_forecast, ai_expense_categorize, ai_debt_collection,
+        ai_payroll_calculate, ai_burnout_detect, ai_demand_plan, ai_supplier_score,
+        ai_churn_predict, ai_upsell_recommend, ai_smart_schedule, ai_sentiment_analyze
+    },
     fb_pack,
     spa_pack,
     auto_pack,
@@ -192,6 +197,19 @@ pub fn create_app(pool: sqlx::PgPool) -> axum::Router {
         .route("/api/v1/ai/logistics/route-optimize", post(ai_route_optimization))
         .route("/api/v1/ai/retail-fnb/demand-forecast", post(ai_demand_forecasting))
         .route("/api/v1/ai/hospitality/dynamic-price", post(ai_dynamic_pricing))
+
+        // Phase F: Extra AI Agents routes
+        .route("/api/v1/ai/finance/cashflow-forecast", post(ai_cashflow_forecast))
+        .route("/api/v1/ai/finance/expense-categorize", post(ai_expense_categorize))
+        .route("/api/v1/ai/finance/debt-collection", post(ai_debt_collection))
+        .route("/api/v1/ai/hr/payroll-calculate", post(ai_payroll_calculate))
+        .route("/api/v1/ai/hr/burnout-detect", post(ai_burnout_detect))
+        .route("/api/v1/ai/inventory/demand-plan", post(ai_demand_plan))
+        .route("/api/v1/ai/inventory/supplier-score", post(ai_supplier_score))
+        .route("/api/v1/ai/crm/churn-predict", post(ai_churn_predict))
+        .route("/api/v1/ai/crm/upsell-recommend", post(ai_upsell_recommend))
+        .route("/api/v1/ai/booking/smart-schedule", post(ai_smart_schedule))
+        .route("/api/v1/ai/feedback/sentiment-analyze", post(ai_sentiment_analyze))
 
         // Billing & Payments
         .route("/api/v1/billing/invoices", post(create_invoice).get(get_invoices))

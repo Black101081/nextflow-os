@@ -28,6 +28,7 @@ from real_estate_lead import RealEstateLeadScoringAgent
 from logistics_route import LogisticsRouteOptimizerAgent
 from demand_forecast import DemandForecastingAgent
 from dynamic_pricing import DynamicPricingAgent
+from extra_agents import ExtraAgents
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -42,6 +43,7 @@ _lead_scoring_agent = RealEstateLeadScoringAgent(_gemini_client)
 _route_optimizer_agent = LogisticsRouteOptimizerAgent(_gemini_client)
 _demand_forecasting_agent = DemandForecastingAgent(_gemini_client)
 _dynamic_pricing_agent = DynamicPricingAgent(_gemini_client)
+_extra_agents = ExtraAgents(_gemini_client)
 
 # --------------------------------------------------------------------------
 # Lifespan: khởi tạo models khi server start
@@ -536,6 +538,63 @@ async def dynamic_pricing_endpoint(req: DynamicPricingRequest):
         req.competitor_price,
         req.is_weekend
     )
+
+# --- Phase F: Extra AI Agents ---
+
+@app.post("/finance/cashflow-forecast")
+async def finance_cashflow_endpoint(req: list[dict]):
+    return _extra_agents.forecast_cash_flow(req)
+
+class ExpenseCategorizeRequest(BaseModel):
+    description: str
+
+@app.post("/finance/expense-categorize")
+async def finance_categorize_endpoint(req: ExpenseCategorizeRequest):
+    return _extra_agents.categorize_expense(req.description)
+
+@app.post("/finance/debt-collection")
+async def finance_debt_endpoint(req: list[dict]):
+    return _extra_agents.analyze_receivables(req)
+
+class PayrollCalculateRequest(BaseModel):
+    attendance: list[dict]
+    rates: dict[str, float]
+
+@app.post("/hr/payroll-calculate")
+async def hr_payroll_endpoint(req: PayrollCalculateRequest):
+    return _extra_agents.calculate_payroll(req.attendance, req.rates)
+
+@app.post("/hr/burnout-detect")
+async def hr_burnout_endpoint(req: list[dict]):
+    return _extra_agents.detect_burnout(req)
+
+@app.post("/inventory/demand-plan")
+async def inventory_demand_endpoint(req: list[dict]):
+    return _extra_agents.plan_demand(req)
+
+@app.post("/inventory/supplier-score")
+async def inventory_supplier_endpoint(req: list[dict]):
+    return _extra_agents.score_suppliers(req)
+
+@app.post("/crm/churn-predict")
+async def crm_churn_endpoint(req: list[dict]):
+    return _extra_agents.predict_churn(req)
+
+@app.post("/crm/upsell-recommend")
+async def crm_upsell_endpoint(req: dict):
+    return _extra_agents.recommend_upsell(req)
+
+@app.post("/booking/smart-schedule")
+async def booking_schedule_endpoint(req: dict):
+    return _extra_agents.suggest_optimal_slots(req)
+
+class SentimentAnalyzeRequest(BaseModel):
+    text: str
+
+@app.post("/feedback/sentiment-analyze")
+async def feedback_sentiment_endpoint(req: SentimentAnalyzeRequest):
+    return _extra_agents.analyze_sentiment(req.text)
+
 
 
 if __name__ == "__main__":

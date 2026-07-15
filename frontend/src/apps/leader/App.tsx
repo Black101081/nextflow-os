@@ -35,6 +35,7 @@ import InventoryManager from './pages/InventoryManager';
 import OperationsManager from './pages/OperationsManager';
 import FrontOperationsManager from './pages/FrontOperationsManager';
 import SecurityHealthManager from './pages/SecurityHealthManager';
+import AICopilotWorkspace from './pages/AICopilotWorkspace';
 
 export default function App() {
   return (
@@ -78,6 +79,7 @@ export default function App() {
             <Route path="operations" element={<OperationsManager />} />
             <Route path="front-ops" element={<FrontOperationsManager />} />
             <Route path="security-health" element={<SecurityHealthManager />} />
+            <Route path="ai-copilot" element={<AICopilotWorkspace />} />
             <Route index element={<Navigate to="/leader/dashboard" replace />} />
           </Route>
 

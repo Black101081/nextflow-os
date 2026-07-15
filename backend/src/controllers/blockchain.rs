@@ -10,6 +10,8 @@ use hex;
 use chrono::Utc;
 
 use crate::AppState;
+use crate::middleware::tenant_isolation::TenantIsolation;
+use crate::services::blockchain::anchor_data_on_chain;
 
 #[derive(Debug, Deserialize)]
 pub struct AnchorPayload {
@@ -25,7 +27,8 @@ pub struct AnchorResponse {
 }
 
 pub async fn anchor_data(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
+    tenant: TenantIsolation,
     Json(payload): Json<AnchorPayload>,
 ) -> Result<impl IntoResponse, Response> {
     // Hash payload using SHA-256 to simulate Blockchain tx_hash securely
@@ -42,10 +45,22 @@ pub async fn anchor_data(
     let result = hasher.finalize();
     let hash_hex = format!("0x{}", hex::encode(result));
 
+    // Thực sự lưu vết neo dữ liệu vào Blockchain Ledger trong CSDL (Zero-Mock)
+    let tx_hash = anchor_data_on_chain(
+        &state.pool,
+        tenant.tenant_id,
+        &hash_hex,
+        &json!({
+            "data": payload.data,
+            "context": payload.context.unwrap_or_default(),
+            "timestamp": now_str
+        })
+    ).await;
+
     let res = AnchorResponse {
-        tx_hash: hash_hex,
+        tx_hash,
         timestamp: now_str,
-        network: "U2U_TESTNET_SIMULATED".to_string(), // Fake network, REAL crypto hash
+        network: "U2U_TESTNET_SIMULATED".to_string(),
     };
 
     Ok(Json(res))

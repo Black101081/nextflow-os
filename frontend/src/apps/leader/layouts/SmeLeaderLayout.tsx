@@ -21,7 +21,8 @@ import {
   Search,
   Users,
   Briefcase,
-  ShieldCheck
+  ShieldCheck,
+  Brain
 } from 'lucide-react';
 import Avatar from '../../../shared/components/ui/Avatar';
 
@@ -65,6 +66,7 @@ export default function SmeLeaderLayout() {
     {
       title: "Tự động hóa",
       items: [
+        { name: "AI Copilot Workspace", href: "/leader/ai-copilot", icon: Brain },
         { name: "Automation Workflow", href: "/leader/workflows", icon: Network },
         { name: "Cấu hình Tích hợp", href: "/leader/integrations", icon: Share2 },
         { name: "Gamification & KPI", href: "/leader/gamification", icon: Trophy },

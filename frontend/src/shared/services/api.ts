@@ -252,6 +252,116 @@ export const apiService = {
     return res.json();
   },
 
+  async runCashflowForecast(auth: any, payload: any[]): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/finance/cashflow-forecast`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Lỗi khi chạy dự báo dòng tiền AI');
+    return res.json();
+  },
+
+  async runExpenseCategorize(auth: any, description: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/finance/expense-categorize`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ description }),
+    });
+    if (!res.ok) throw new Error('Lỗi khi phân loại chi phí AI');
+    return res.json();
+  },
+
+  async runDebtCollection(auth: any, payload: any[]): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/finance/debt-collection`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Lỗi khi xếp hạng công nợ AI');
+    return res.json();
+  },
+
+  async runPayrollCalculate(auth: any, attendance: any[], rates: Record<string, number>): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/hr/payroll-calculate`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ attendance, rates }),
+    });
+    if (!res.ok) throw new Error('Lỗi khi tính toán bảng lương AI');
+    return res.json();
+  },
+
+  async runBurnoutDetect(auth: any, payload: any[]): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/hr/burnout-detect`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Lỗi khi phân tích Burnout AI');
+    return res.json();
+  },
+
+  async runDemandPlan(auth: any, payload: any[]): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/inventory/demand-plan`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Lỗi khi lập kế hoạch tồn kho AI');
+    return res.json();
+  },
+
+  async runSupplierScore(auth: any, payload: any[]): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/inventory/supplier-score`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Lỗi khi xếp hạng nhà cung cấp AI');
+    return res.json();
+  },
+
+  async runChurnPredict(auth: any, payload: any[]): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/crm/churn-predict`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Lỗi khi dự báo churn AI');
+    return res.json();
+  },
+
+  async runUpsellRecommend(auth: any, payload: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/crm/upsell-recommend`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Lỗi khi gợi ý Upsell AI');
+    return res.json();
+  },
+
+  async runSmartSchedule(auth: any, payload: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/booking/smart-schedule`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Lỗi khi gợi ý lịch đặt AI');
+    return res.json();
+  },
+
+  async runSentimentAnalyze(auth: any, text: string): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/feedback/sentiment-analyze`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) throw new Error('Lỗi khi phân tích cảm xúc AI');
+    return res.json();
+  },
+
   async analyzeSentiment(auth: any, text: string): Promise<number> {
     const res = await fetch(`${API_BASE_URL}/api/v1/intelligence/analyze-sentiment`, {
       method: 'POST',

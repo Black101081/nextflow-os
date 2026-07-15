@@ -47,3 +47,4 @@ pub mod front_facing;
 pub mod security_health;
 pub mod crm_extra;
 pub mod platform_maturity;
+pub mod extra_ai;
