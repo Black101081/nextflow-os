@@ -1,0 +1,116 @@
+{
+    "id": "tpl_contractor",
+    "name": "Contractor & Interior Pack",
+    "description": "Quản lý dự án thi công và hoàn thiện nội thất. Tích hợp hồ sơ thiết kế, theo dõi tiến độ thi công thực địa và kiểm định vật tư.",
+    "category": "construction",
+    "policies": [
+        {
+            "name": "SLA - Khảo sát mặt bằng",
+            "description": "Thời gian khảo sát đo đạc thực tế không quá 48 giờ kể từ khi nhận yêu cầu.",
+            "target_type": "time_based",
+            "target_value": "48",
+            "action": "escalate"
+        }
+    ],
+    "queues": [
+        {
+            "name": "Khảo sát & Đo đạc",
+            "description": "Tiếp nhận mặt bằng và đo đạc kích thước thực tế",
+            "priority": 1,
+            "color": "orange",
+            "icon": "Home"
+        },
+        {
+            "name": "Giám sát thi công",
+            "description": "Kiểm tra tiến độ và chất lượng thi công tại công trình",
+            "priority": 2,
+            "color": "blue",
+            "icon": "Eye"
+        }
+    ],
+    "sops": [
+        {
+            "title": "Tiêu chuẩn Nghiệm thu Bàn giao",
+            "content": "## 1. Kiểm tra kỹ thuật\n- Kiểm tra độ phẳng của tường sơn bả bằng đèn chuyên dụng.\n- Vận hành thử hệ thống điện, ổ cắm và vòi nước.\n## 2. Vệ sinh công nghiệp\n- Thu dọn toàn bộ vật tư thừa, rác thải xây dựng.\n- Hút bụi và lau sạch bề mặt gỗ trước khi bàn giao cho chủ nhà."
+        }
+    ],
+    "connectors": [],
+    "entities": [
+        {
+            "name": "Dự án Thi công",
+            "system_name": "construction_project",
+            "description": "Thực thể quản lý công trình đang thi công",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "projectName": {
+                        "type": "string"
+                    },
+                    "address": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    ],
+    "workflows": [
+        {
+            "name": "Interior Project Flow",
+            "trigger_event": "entity.construction_project.created",
+            "dag": {
+                "workflow_id": "00000000-0000-0000-0000-000000000005",
+                "nodes": [
+                    {
+                        "id": "trigger",
+                        "name": "Khi tạo dự án thi công mới",
+                        "type": "Trigger",
+                        "event_name": "entity.construction_project.created"
+                    },
+                    {
+                        "id": "ai_estimate",
+                        "name": "AI ước lượng nguyên vật liệu",
+                        "type": "AiPredict",
+                        "model": "gemini-1.5-flash",
+                        "prompt_template": "Dựa trên quy mô dự án '{{payload.projectName}}' tại {{payload.address}}, đề xuất danh mục vật tư cần mua."
+                    },
+                    {
+                        "id": "blockchain_anchor",
+                        "name": "Lưu biên bản bàn giao lên Blockchain",
+                        "type": "BlockchainAnchor",
+                        "data_payload": {
+                            "project_name": "{{payload.projectName}}",
+                            "status": "APPROVED"
+                        }
+                    },
+                    {
+                        "id": "zalo_send",
+                        "name": "Gửi tiến độ cho Chủ đầu tư",
+                        "type": "ZaloZNSNode",
+                        "phone_number": "{{payload.customer_phone}}",
+                        "template_id": "const_alert",
+                        "template_data": {
+                            "project_name": "{{payload.projectName}}"
+                        }
+                    }
+                ],
+                "edges": [
+                    {
+                        "source_id": "trigger",
+                        "target_id": "ai_estimate"
+                    },
+                    {
+                        "source_id": "ai_estimate",
+                        "target_id": "blockchain_anchor"
+                    },
+                    {
+                        "source_id": "blockchain_anchor",
+                        "target_id": "zalo_send"
+                    }
+                ]
+            }
+        }
+    ]
+}

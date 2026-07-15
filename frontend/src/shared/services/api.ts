@@ -43,6 +43,24 @@ export const getHeaders = (auth?: any) => {
 
 export const apiService = {
   // 0. Dynamic Entities
+  async getAnalytics(auth: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/meta/analytics`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) throw new Error('Lỗi khi lấy dữ liệu Analytics');
+    return res.json();
+  },
+
+  async getInvoices(auth: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/billing/invoices`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) throw new Error('Lỗi khi lấy danh sách hóa đơn');
+    return res.json();
+  },
+
   async getEntities(auth: any): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/api/v1/meta/entities`, {
       method: 'GET',
@@ -141,6 +159,19 @@ export const apiService = {
     return res.json();
   },
 
+  // 0. Blockchain Anchor
+  async anchorData(auth: any, payload: { data: string, context?: string }): Promise<{tx_hash: string, timestamp: string, network: string}> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/blockchain/anchor`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      throw new Error('Lỗi khi tạo mã bảo mật Blockchain');
+    }
+    return res.json();
+  },
+
   // 1. Phân loại tác vụ tự động bằng AI (Auto-Triage)
   async autoTriageTask(auth: any, taskId: string, title: string, description?: string): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/api/v1/intelligence/auto-triage`, {
@@ -184,6 +215,74 @@ export const apiService = {
       throw new Error(err.message || 'Lỗi khi tạo Workflow bằng AI');
     }
     return res.json();
+  },
+
+  async getWorkflows(auth: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/meta/workflows`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) throw new Error('Lỗi khi lấy danh sách Workflow');
+    return res.json();
+  },
+
+  async createWorkflow(auth: any, payload: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/meta/workflows`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Lỗi khi tạo Workflow');
+    }
+    return res.json();
+  },
+
+  async toggleWorkflow(auth: any, id: string, isActive: boolean): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/meta/workflows/${id}/toggle`, {
+      method: 'PUT',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ is_active: isActive }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Lỗi khi thay đổi trạng thái Workflow');
+    }
+    return res.json();
+  },
+
+  async analyzeSentiment(auth: any, text: string): Promise<number> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/intelligence/analyze-sentiment`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return data.data.sentiment_score;
+  },
+
+  async analyzeFraud(auth: any, text: string): Promise<number> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/intelligence/analyze-fraud`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return data.data.fraud_score;
+  },
+
+  async analyzeBurnout(auth: any, text: string): Promise<number> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/intelligence/analyze-burnout`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return data.data.burnout_risk;
   },
   
   // 3. Lấy danh sách Extensions trên Marketplace
@@ -527,17 +626,6 @@ export const apiService = {
     return res.json();
   },
 
-  // 16. POST /api/v1/ai/rag-query — hỏi RAG SOP Assistant
-  async queryRagAssistant(auth: any, question: string, topK = 5) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/ai/rag-query`, {
-      method: 'POST',
-      headers: getHeaders(auth),
-      body: JSON.stringify({ question, top_k: topK }),
-    });
-    if (!res.ok) throw new Error('RAG Assistant không khả dụng');
-    return res.json();
-  },
-
   // 17. POST /api/v1/tenants/initialize-template (Cấu hình mẫu Tenant)
   async initializeTenantTemplate(auth: any, templateId: string, wipeExisting: boolean) {
     const res = await fetch(`${API_BASE_URL}/api/v1/tenants/initialize-template`, {
@@ -642,6 +730,20 @@ export const apiService = {
     return res.json();
   },
 
+  async getPlatformLedger(tenantId?: string): Promise<any[]> {
+    const url = tenantId 
+      ? `${API_BASE_URL}/api/v1/platform/blockchain/ledger?tenant_id=${tenantId}`
+      : `${API_BASE_URL}/api/v1/platform/blockchain/ledger`;
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error('Không thể tải dữ liệu Blockchain Ledger.');
+    }
+    return res.json();
+  },
+
   // 23. GET /api/v1/tenants/templates (List all vertical template packs)
   async getTemplatePacks(): Promise<TemplatePack[]> {
     const res = await fetch(`${API_BASE_URL}/api/v1/tenants/templates`);
@@ -737,16 +839,6 @@ export const apiService = {
   // =====================================================================
   // Phase 7: Billing & Payments
   // =====================================================================
-
-  // 30. GET /api/v1/billing/invoices (Lấy danh sách hóa đơn)
-  async getInvoices(auth: any) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/billing/invoices`, {
-      method: 'GET',
-      headers: getHeaders(auth),
-    });
-    if (!res.ok) throw new Error('Không thể tải danh sách hóa đơn');
-    return res.json();
-  },
 
   // 31. POST /api/v1/billing/invoices (Tạo hóa đơn & Payment link)
   async createInvoice(auth: any, payload: { work_item_id: string; amount: number; due_date?: string }) {
@@ -903,6 +995,29 @@ export const apiService = {
     return res.json();
   },
 
+  async installVerticalPack(auth: any, templateId: string) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/marketplace/install-vertical`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ template_id: templateId }),
+    });
+    if (!res.ok) throw new Error('Failed to install vertical pack');
+    return res.json();
+  },
+
+  async redeemVoucher(auth: any, pointsAmount: number) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/gamification/redeem-voucher`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: JSON.stringify({ points_amount: pointsAmount }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to redeem voucher');
+    }
+    return res.json();
+  },
+
   async seedDemoData(auth: any): Promise<any> {
     const res = await fetch(`${API_BASE_URL}/api/v1/tenants/seed-demo`, {
       method: 'POST',
@@ -1017,6 +1132,117 @@ export const apiService = {
     });
     if (!res.ok) throw new Error('Failed to load check-ins');
     return res.json();
+  },
+
+  // ── Platform Admin: Users ──────────────────────────────
+  async getPlatformUsers(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/platform/users`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Không thể tải danh sách users.');
+    return res.json();
+  },
+
+  // ── Platform Admin: Billing ──────────────────────────────
+  async getPlatformBillingOverview(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/platform/billing/invoices`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Không thể tải dữ liệu hóa đơn.');
+    return res.json();
+  },
+
+  // ── Platform Admin: Audit Logs ───────────────────────────
+  async getPlatformAuditLogs(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/platform/audit-logs`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Không thể tải audit logs.');
+    return res.json();
+  },
+
+  // ── Platform Admin: Webhook Stats ────────────────────────
+  async getPlatformWebhookStats(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/platform/webhook-stats`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Không thể tải webhook stats.');
+    return res.json();
+  },
+
+  // ── Platform Admin: AI Usage ─────────────────────────────
+  async getPlatformAiUsage(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/platform/ai-usage`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Không thể tải AI usage.');
+    return res.json();
+  },
+
+  // ── Platform Admin: Connectors ───────────────────────────
+  async getPlatformConnectors(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/connectors/configs`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Không thể tải danh sách connectors.');
+    return res.json();
+  },
+
+  // ── Platform Admin: AI Health ────────────────────────────
+  async getAiHealth(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/ai/health`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Không thể kiểm tra trạng thái AI.');
+    return res.json();
+  },
+
+  // ── Platform Admin: Gamification ─────────────────────────
+  async getPlatformLeaderboard(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/gamification/leaderboard`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error('Không thể tải bảng xếp hạng.');
+    return res.json();
+  },
+
+  async awardGamificationPoints(payload: { user_id: string; work_item_id?: string; points_change: number; reason: string }): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/gamification/award`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Không thể trao điểm thưởng.');
+    return res.json();
+  },
+
+  async get(url: string, auth?: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}${url}`, {
+      method: 'GET',
+      headers: getHeaders(auth),
+    });
+    if (!res.ok) throw new Error(`GET request failed: ${res.statusText}`);
+    const json = await res.json();
+    return { data: json };
+  },
+
+  async post(url: string, body?: any, auth?: any): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}${url}`, {
+      method: 'POST',
+      headers: getHeaders(auth),
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!res.ok) throw new Error(`POST request failed: ${res.statusText}`);
+    const json = await res.json();
+    return { data: json };
   }
 };
 

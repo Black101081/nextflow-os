@@ -1,0 +1,117 @@
+{
+    "id": "tpl_retail_standard",
+    "name": "Retail POS & Inventory Pack",
+    "description": "Hệ thống chuẩn hóa vận hành Chuỗi bán lẻ, Siêu thị mini. Tự động hóa kiểm kho, Trưng bày hàng hóa (Visual Merchandising) và quy trình Đóng ca.",
+    "category": "retail",
+    "policies": [
+        {
+            "name": "SLA - Kiểm kho chốt ca",
+            "description": "Bắt buộc nhân viên đóng ca phải đếm và chốt tồn kho tiền mặt, hàng hóa trước khi về.",
+            "target_type": "completion",
+            "target_value": "100",
+            "action": "hold_salary_advance"
+        }
+    ],
+    "queues": [
+        {
+            "name": "Trưng bày hàng hóa (VM)",
+            "description": "Sắp xếp kệ hàng đúng quy định trưng bày",
+            "priority": 2,
+            "color": "blue",
+            "icon": "LayoutDashboard"
+        },
+        {
+            "name": "Kiểm kê kho định kỳ",
+            "description": "Đếm số lượng thực tế so với POS",
+            "priority": 1,
+            "color": "purple",
+            "icon": "Package"
+        }
+    ],
+    "sops": [
+        {
+            "title": "SOP Trưng bày Cửa hàng (VM)",
+            "content": "## Nguyên tắc Trưng bày\n- Hàng mới nhập (Date xa) xếp phía trong, hàng nhập trước (Date gần) xếp phía ngoài (FIFO).\n- Mặt tiền sản phẩm (face) phải luôn hướng ra ngoài, không bị ngược chữ.\n- Nhãn giá phải đặt chính giữa mặt hàng, mép kệ."
+        }
+    ],
+    "connectors": [
+        {
+            "name": "kiotviet",
+            "settings": {
+                "sync_customers": true,
+                "sync_orders": true
+            }
+        },
+        {
+            "name": "zalo_oa",
+            "settings": {
+                "enable_zns": true
+            }
+        }
+    ],
+    "entities": [
+        {
+            "name": "Đơn hàng KiotViet",
+            "system_name": "kiotviet_order",
+            "description": "Thực thể lưu trữ đơn hàng đồng bộ từ KiotViet",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "orderCode": { "type": "string" },
+                    "totalPayment": { "type": "number" },
+                    "customerName": { "type": "string" },
+                    "customerPhone": { "type": "string" }
+                }
+            }
+        }
+    ],
+    "workflows": [
+        {
+            "name": "Auto ZNS on New Order",
+            "trigger_event": "entity.kiotviet_order.created",
+            "dag": {
+                "workflow_id": "00000000-0000-0000-0000-000000000003",
+                "nodes": [
+                    {
+                        "id": "trigger",
+                        "name": "Khi nhận đơn hàng mới từ KiotViet",
+                        "type": "Trigger",
+                        "event_name": "entity.kiotviet_order.created"
+                    },
+                    {
+                        "id": "ai_route",
+                        "name": "AI phân tích giỏ hàng & Gợi ý chéo",
+                        "type": "AiPredict",
+                        "model": "gemini-1.5-flash",
+                        "prompt_template": "Phân tích đơn hàng '{{payload.orderCode}}' trị giá {{payload.totalPayment}} để gợi ý sản phẩm bán kèm tối ưu."
+                    },
+                    {
+                        "id": "blockchain_anchor",
+                        "name": "Lưu bằng chứng giao dịch lên Blockchain",
+                        "type": "BlockchainAnchor",
+                        "data_payload": {
+                            "order_code": "{{payload.orderCode}}",
+                            "total_payment": "{{payload.totalPayment}}"
+                        }
+                    },
+                    {
+                        "id": "zalo_send",
+                        "name": "Gửi thông báo ZNS chăm sóc khách hàng",
+                        "type": "ZaloZNSNode",
+                        "phone_number": "{{payload.customerPhone}}",
+                        "template_id": "retail_order_confirm",
+                        "template_data": {
+                            "order_code": "{{payload.orderCode}}",
+                            "amount": "{{payload.totalPayment}}"
+                        }
+                    }
+                ],
+                "edges": [
+                    { "source_id": "trigger", "target_id": "ai_route" },
+                    { "source_id": "ai_route", "target_id": "blockchain_anchor" },
+                    { "source_id": "blockchain_anchor", "target_id": "zalo_send" }
+                ]
+            }
+        }
+    ]
+}

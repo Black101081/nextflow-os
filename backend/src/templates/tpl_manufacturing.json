@@ -1,0 +1,109 @@
+{
+    "id": "tpl_manufacturing",
+    "name": "Micro-Manufacturing Pack",
+    "description": "Số hóa quản lý xưởng cơ khí, may mặc, nội thất quy mô nhỏ. Quản lý lệnh sản xuất, cấp phát vật tư và kiểm định chất lượng QA.",
+    "category": "manufacturing",
+    "policies": [
+        {
+            "name": "SLA - Kiểm định chất lượng QA",
+            "description": "Mọi lô hàng hoàn thành phải được kiểm định chất lượng trong vòng 4 giờ trước khi nhập kho.",
+            "target_type": "response_time",
+            "target_value": "240",
+            "action": "escalate"
+        }
+    ],
+    "queues": [
+        {
+            "name": "Kiểm định chất lượng thành phẩm QA",
+            "description": "Đo đạc kích thước dung sai và kiểm tra bề mặt lớp sơn phủ",
+            "priority": 1,
+            "color": "rose",
+            "icon": "CheckSquare"
+        }
+    ],
+    "sops": [
+        {
+            "title": "Quy trình Kiểm Định Lô Hàng",
+            "content": "## 1. Đo kích thước hình học\n- Sử dụng thước kẹp kỹ thuật số đo các kích thước quan trọng.\n- So sánh kết quả với bản vẽ thiết kế 2D đính kèm.\n## 2. Kiểm định độ bền\n- Thực hiện test áp lực hoặc test độ bám dính của lớp sơn phủ.\n- Dán tem chất lượng xanh lá cây nếu lô hàng đạt chuẩn."
+        }
+    ],
+    "connectors": [],
+    "entities": [
+        {
+            "name": "Lệnh sản xuất",
+            "system_name": "production_order",
+            "description": "Thông tin lệnh sản xuất sản phẩm gỗ/cơ khí",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "workOrderNo": {
+                        "type": "string"
+                    },
+                    "productName": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "number"
+                    }
+                }
+            }
+        }
+    ],
+    "workflows": [
+        {
+            "name": "Production Order Flow",
+            "trigger_event": "entity.production_order.created",
+            "dag": {
+                "workflow_id": "00000000-0000-0000-0000-000000000009",
+                "nodes": [
+                    {
+                        "id": "trigger",
+                        "name": "Khi tạo lệnh sản xuất mới",
+                        "type": "Trigger",
+                        "event_name": "entity.production_order.created"
+                    },
+                    {
+                        "id": "ai_plan",
+                        "name": "AI ước lượng nhân công sản xuất",
+                        "type": "AiPredict",
+                        "model": "gemini-1.5-flash",
+                        "prompt_template": "Dự đoán số giờ công cần thiết để sản xuất lô hàng '{{payload.productName}}' với số lượng {{payload.quantity}}."
+                    },
+                    {
+                        "id": "blockchain_anchor",
+                        "name": "Ghi nhận kiểm định chất lượng lên Blockchain",
+                        "type": "BlockchainAnchor",
+                        "data_payload": {
+                            "work_order_no": "{{payload.workOrderNo}}",
+                            "approved": true
+                        }
+                    },
+                    {
+                        "id": "zalo_send",
+                        "name": "Gửi thông báo hoàn thành sản phẩm",
+                        "type": "ZaloZNSNode",
+                        "phone_number": "{{payload.customer_phone}}",
+                        "template_id": "prod_done",
+                        "template_data": {
+                            "work_order_no": "{{payload.workOrderNo}}"
+                        }
+                    }
+                ],
+                "edges": [
+                    {
+                        "source_id": "trigger",
+                        "target_id": "ai_plan"
+                    },
+                    {
+                        "source_id": "ai_plan",
+                        "target_id": "blockchain_anchor"
+                    },
+                    {
+                        "source_id": "blockchain_anchor",
+                        "target_id": "zalo_send"
+                    }
+                ]
+            }
+        }
+    ]
+}

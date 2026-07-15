@@ -20,6 +20,19 @@ async fn setup_test_db(pool: &PgPool) {
         .await
         .unwrap();
 
+    println!("[Test Setup] Seeding system roles...");
+    sqlx::query(
+        "INSERT INTO nf_core.roles (id, name, description, is_system_role) VALUES
+         ('SME_LEADER', 'Leader / Owner', 'Chủ doanh nghiệp, có toàn quyền trên hệ thống', TRUE),
+         ('SME_SUPERVISOR', 'Supervisor / Manager', 'Quản lý, có quyền phân việc và xem báo cáo vận hành', TRUE),
+         ('SME_OPS', 'Operator / Staff', 'Nhân viên văn phòng, xử lý công việc', TRUE),
+         ('FIELD_WORKER', 'Field Worker', 'Nhân viên hiện trường', TRUE)
+         ON CONFLICT (id) DO NOTHING"
+    )
+    .execute(pool)
+    .await
+    .unwrap();
+
     println!("[Test Setup] Seeding test Tenant...");
     sqlx::query(
         "INSERT INTO nf_core.tenants (id, company_name, domain, status, subscription_tier) 

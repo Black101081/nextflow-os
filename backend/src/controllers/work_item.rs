@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
@@ -111,7 +111,7 @@ pub async fn create_work_item(
 
     let priority = payload.priority.unwrap_or_else(|| "MEDIUM".to_string());
     let source = payload.source.unwrap_or_else(|| "MANUAL".to_string());
-    let metadata = payload.metadata.unwrap_or_else(|| json!({}));
+    let metadata = payload.metadata.clone().unwrap_or_else(|| json!({}));
 
     let row = sqlx::query(insert_query)
         .bind(tenant.tenant_id)
@@ -135,7 +135,7 @@ pub async fn create_work_item(
                 .into_response()
         })?;
 
-    let res = WorkItemResponse {
+    let mut res = WorkItemResponse {
         id: row.get("id"),
         queue_id: row.get("queue_id"),
         title: row.get("title"),
@@ -154,6 +154,24 @@ pub async fn create_work_item(
         invoice_data_hash: None,
         invoice_tx_hash: None,
     };
+
+    // Automation Workflow: Auto-Approval Chains
+    if let Some(category) = &payload.category {
+        if category == "APPROVAL_REQUEST" || category == "EXPENSE" {
+            if let Some(meta) = payload.metadata.as_ref() {
+                if let Some(amount) = meta.get("amount").and_then(|a| a.as_f64()) {
+                    if amount < 2_000_000.0 {
+                        let _ = sqlx::query("UPDATE nf_core.work_items SET status = 'COMPLETED' WHERE id = $1")
+                            .bind(res.id)
+                            .execute(&state.pool)
+                            .await;
+                        res.status = "COMPLETED".to_string();
+                        println!("[Auto-Approval] Task {} auto-approved because amount {} < 2M", res.id, amount);
+                    }
+                }
+            }
+        }
+    }
 
     // Real-time WebSocket Broadcast notification
     let _ = state.tx.send(json!({
@@ -433,30 +451,54 @@ pub async fn trigger_sla_scan(
     Ok(Json(result))
 }
 
-// API GET /api/v1/work-items
+// API GET /api/v1/work-items?category=<cat>&limit=<n>
+#[derive(Debug, Deserialize)]
+pub struct GetWorkItemsQuery {
+    pub category: Option<String>,
+    pub limit: Option<i64>,
+}
+
 pub async fn get_work_items(
     State(state): State<AppState>,
     tenant: TenantIsolation,
+    Query(params): Query<GetWorkItemsQuery>,
 ) -> Result<impl IntoResponse, Response> {
-    let query = r#"
-        SELECT id, queue_id, title, status, priority, category, created_at, due_at, version, metadata, assignee_id
-        FROM nf_core.work_items
-        WHERE tenant_id = $1
-        ORDER BY created_at DESC
-    "#;
+    let limit = params.limit.unwrap_or(50).min(200);
 
-    let rows = sqlx::query(query)
+    let rows = if let Some(ref cat) = params.category {
+        sqlx::query(
+            r#"SELECT id, queue_id, title, status, priority, category, created_at, due_at, version, metadata, assignee_id
+               FROM nf_core.work_items
+               WHERE tenant_id = $1 AND category = $2
+               ORDER BY created_at DESC
+               LIMIT $3"#
+        )
         .bind(tenant.tenant_id)
+        .bind(cat)
+        .bind(limit)
         .fetch_all(&state.pool)
         .await
-        .map_err(|err| {
-            eprintln!("[WorkItem Controller] Query items error: {}", err);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": { "code": "SYSTEM_FAULT", "message": "Lỗi máy chủ." } })),
-            )
-                .into_response()
-        })?;
+    } else {
+        sqlx::query(
+            r#"SELECT id, queue_id, title, status, priority, category, created_at, due_at, version, metadata, assignee_id
+               FROM nf_core.work_items
+               WHERE tenant_id = $1
+               ORDER BY created_at DESC
+               LIMIT $2"#
+        )
+        .bind(tenant.tenant_id)
+        .bind(limit)
+        .fetch_all(&state.pool)
+        .await
+    }
+    .map_err(|err| {
+        eprintln!("[WorkItem Controller] Query items error: {}", err);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": { "code": "SYSTEM_FAULT", "message": "Lỗi máy chủ." } })),
+        )
+            .into_response()
+    })?;
 
     let items: Vec<Value> = rows.into_iter().map(|row| {
         let response_metadata = row.get::<serde_json::Value, _>("metadata");
@@ -479,7 +521,7 @@ pub async fn get_work_items(
         })
     }).collect();
 
-    Ok(Json(items))
+    Ok(Json(json!({ "work_items": items, "total": items.len() })))
 }
 
 pub async fn upload_work_item_evidence(

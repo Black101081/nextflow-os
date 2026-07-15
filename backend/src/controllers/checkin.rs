@@ -32,12 +32,25 @@ pub async fn create_checkin(
         RETURNING id
     "#;
 
-    // Use tenant_id as worker_id if we don't have proper user auth middleware yet.
-    // In production we would extract the `worker_id` from claims.
-    // But since `tenant` is from claims, we can use `tenant.tenant_id` for testing,
-    // wait, we need worker_id which should be user.id. For now we can use tenant_id if we don't have user_id, 
-    // actually let's just use tenant_id as worker_id placeholder.
-    let worker_id = tenant.tenant_id;
+    // Use tenant.user_id if present from JWT, otherwise fallback to tenant_id (for compatibility/older tests)
+    let worker_id = tenant.user_id.unwrap_or(tenant.tenant_id);
+
+    // Blockchain Anchoring
+    let payload_to_anchor = serde_json::json!({
+        "event": "FIELD_CHECKIN_ANCHOR",
+        "tenant_id": tenant.tenant_id.to_string(),
+        "worker_id": worker_id.to_string(),
+        "latitude": payload.latitude,
+        "longitude": payload.longitude,
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    });
+    let hash = crate::services::blockchain::compute_data_hash(&payload_to_anchor);
+    let tx_hash = crate::services::blockchain::anchor_data_on_chain(&state.pool, tenant.tenant_id, &hash, &payload_to_anchor).await;
+    
+    let mut enriched_metadata = payload.metadata.unwrap_or(serde_json::json!({}));
+    if let Some(obj) = enriched_metadata.as_object_mut() {
+        obj.insert("tx_hash".to_string(), serde_json::json!(tx_hash));
+    }
 
     let row = sqlx::query(query)
         .bind(tenant.tenant_id)
@@ -46,7 +59,7 @@ pub async fn create_checkin(
         .bind(payload.longitude)
         .bind(payload.accuracy)
         .bind(&payload.image_base64)
-        .bind(&payload.metadata)
+        .bind(&enriched_metadata)
         .fetch_one(&state.pool)
         .await;
 
@@ -55,7 +68,8 @@ pub async fn create_checkin(
             let id: Uuid = r.get("id");
             (StatusCode::CREATED, Json(serde_json::json!({
                 "status": "success",
-                "checkin_id": id
+                "checkin_id": id,
+                "tx_hash": tx_hash
             }))).into_response()
         },
         Err(e) => {

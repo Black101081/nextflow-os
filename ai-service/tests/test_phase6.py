@@ -244,6 +244,147 @@ class TestRagAssistant:
 
 
 # --------------------------------------------------------------------------
+# Tests: Pharmacy Drug Interaction Agent
+# --------------------------------------------------------------------------
+class TestPharmacyDrugInteraction:
+    def test_lookup_conflict(self):
+        from drug_interaction import PharmacyDrugInteractionAgent
+        agent = PharmacyDrugInteractionAgent()
+        # Aspirin and Warfarin have known interaction
+        res = agent.lookup_local_interactions(["Aspirin", "Warfarin", "Amoxicillin"])
+        assert len(res) >= 1
+        assert any(w["severity"] == "MAJOR" for w in res)
+        print("[PASS] test_lookup_conflict")
+
+    def test_lookup_no_conflict(self):
+        from drug_interaction import PharmacyDrugInteractionAgent
+        agent = PharmacyDrugInteractionAgent()
+        res = agent.lookup_local_interactions(["Amoxicillin", "Vitamin C"])
+        assert len(res) == 0
+        print("[PASS] test_lookup_no_conflict")
+
+    async def test_agent_check_async(self):
+        import asyncio
+        from drug_interaction import PharmacyDrugInteractionAgent
+        agent = PharmacyDrugInteractionAgent()
+        meds = [{"name": "Sildenafil", "dosage": "50mg"}, {"name": "Nitroglycerin", "dosage": "0.4mg"}]
+        res = await agent.check("rx-123", meds)
+        assert res["safe"] is False
+        assert len(res["warnings"]) >= 1
+        assert "Chống chỉ định" in res["warnings"][0] or "hypotension" in res["warnings"][0].lower() or "huyết áp" in res["warnings"][0]
+        print("[PASS] test_agent_check_async")
+
+
+# --------------------------------------------------------------------------
+# Tests: Real Estate Lead Scoring Agent
+# --------------------------------------------------------------------------
+class TestRealEstateLeadScoring:
+    def test_hot_lead(self):
+        from real_estate_lead import RealEstateLeadScoringAgent
+        agent = RealEstateLeadScoringAgent()
+        lead = {
+            "budget_vnd": 6_000_000_000,
+            "interaction_count": 8,
+            "source": "referral",
+            "property_type": "Condo",
+            "urgency": "high"
+        }
+        res = agent.score(lead)
+        assert res["score"] >= 80
+        assert res["classification"] == "HOT"
+        print("[PASS] test_hot_lead")
+
+    def test_cold_lead(self):
+        from real_estate_lead import RealEstateLeadScoringAgent
+        agent = RealEstateLeadScoringAgent()
+        lead = {
+            "budget_vnd": 500_000_000,
+            "interaction_count": 1,
+            "source": "social",
+            "property_type": "",
+            "urgency": "low"
+        }
+        res = agent.score(lead)
+        assert res["score"] < 50
+        assert res["classification"] == "COLD"
+        print("[PASS] test_cold_lead")
+
+
+# --------------------------------------------------------------------------
+# Tests: Logistics Route Optimizer Agent
+# --------------------------------------------------------------------------
+class TestLogisticsRouteOptimizer:
+    def test_route_optimization(self):
+        from logistics_route import LogisticsRouteOptimizerAgent
+        agent = LogisticsRouteOptimizerAgent()
+        stops = [
+            {"id": "s1", "address": "Quận 3"},
+            {"id": "s2", "address": "Gò Vấp"},
+            {"id": "s3", "address": "Quận 7"}
+        ]
+        res = agent.optimize(stops)
+        assert len(res["optimized_stops"]) == 3
+        assert res["total_distance_km"] > 0.0
+        assert res["estimated_duration_mins"] > 0
+        # Check coordinates presence
+        for s in res["optimized_stops"]:
+            assert "coords" in s
+            assert "lat" in s["coords"]
+            assert "lon" in s["coords"]
+        print("[PASS] test_route_optimization")
+
+
+# --------------------------------------------------------------------------
+# Tests: Demand Forecasting Agent
+# --------------------------------------------------------------------------
+class TestDemandForecasting:
+    def test_forecast_calculation(self):
+        from demand_forecast import DemandForecastingAgent
+        agent = DemandForecastingAgent()
+        sales = [10.0, 12.0, 15.0, 8.0, 11.0, 13.0, 14.0]
+        res = agent.forecast(sales, horizon=5)
+        assert len(res["forecast"]) == 5
+        assert len(res["confidence_intervals"]) == 5
+        assert res["mean_historical"] == 11.86
+        assert "recommendation" in res
+        print("[PASS] test_forecast_calculation")
+
+
+# --------------------------------------------------------------------------
+# Tests: Dynamic Pricing Agent
+# --------------------------------------------------------------------------
+class TestDynamicPricing:
+    def test_high_occupancy_weekend(self):
+        from dynamic_pricing import DynamicPricingAgent
+        agent = DynamicPricingAgent()
+        res = agent.calculate_price(
+            base_price=1000000.0,
+            occupancy_rate=95.0,
+            competitor_price=1500000.0,
+            is_weekend=True
+        )
+        # base_price (1,000,000) * 1.35 (occupancy >= 90) * 1.10 (weekend) = 1,485,000 VND
+        assert res["suggested_price"] == 1485000.0
+        assert res["price_change_percent"] == 48.5
+        print("[PASS] test_high_occupancy_weekend")
+
+    def test_low_occupancy_competitor_matching(self):
+        from dynamic_pricing import DynamicPricingAgent
+        agent = DynamicPricingAgent()
+        res = agent.calculate_price(
+            base_price=1000000.0,
+            occupancy_rate=20.0,
+            competitor_price=700000.0,
+            is_weekend=False
+        )
+        # occupancy adjustment: 1,000,000 * 0.85 = 850,000 VND
+        # competitor price (700,000) is more than 15% cheaper than 850,000 (which is 722,500)
+        # price drops 10% to 765,000 VND (above 80% base of 800,000) -> min allowed is 800,000 VND.
+        assert res["suggested_price"] == 800000.0
+        print("[PASS] test_low_occupancy_competitor_matching")
+
+
+# --------------------------------------------------------------------------
 # Runner
 # --------------------------------------------------------------------------
 def run_all_tests():
@@ -254,7 +395,18 @@ def run_all_tests():
     passed = 0
     failed = 0
 
-    for TestClass in [TestSlaRiskEngine, TestRoutingRecommender, TestRagAssistant]:
+    test_classes = [
+        TestSlaRiskEngine,
+        TestRoutingRecommender,
+        TestRagAssistant,
+        TestPharmacyDrugInteraction,
+        TestRealEstateLeadScoring,
+        TestLogisticsRouteOptimizer,
+        TestDemandForecasting,
+        TestDynamicPricing
+    ]
+
+    for TestClass in test_classes:
         instance = TestClass()
         class_name = TestClass.__name__
         print(f"\n📋 {class_name}")
@@ -262,7 +414,14 @@ def run_all_tests():
         methods = [m for m in dir(instance) if m.startswith("test_")]
         for method_name in methods:
             try:
-                getattr(instance, method_name)()
+                # Handle async test methods
+                import inspect
+                method = getattr(instance, method_name)
+                if inspect.iscoroutinefunction(method):
+                    import asyncio
+                    asyncio.run(method())
+                else:
+                    method()
                 passed += 1
             except AssertionError as e:
                 print(f"[FAIL] {method_name}: {e}")

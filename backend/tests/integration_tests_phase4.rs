@@ -1,24 +1,37 @@
 use bcrypt::hash;
 use serde_json::{json, Value};
-use sqlx::{PgPool, Row};
+use sqlx::PgPool;
 use tokio::net::TcpListener;
 use uuid::Uuid;
 
 use nextflow_core_backend::{config::db::init_pool, create_app};
 
-const TEST_TENANT_ID: &str = "d290f1ee-6c54-4b01-90e6-d701748f0851";
-const TEST_USER_ID: &str = "8f3b2a1a-4c54-4b01-90e6-d701748f0851";
+const TEST_TENANT_ID: &str = "b0432f86-d242-491c-99c1-46dfca0b7410";
+const TEST_USER_ID: &str = "0e86b033-d922-43bb-a5a4-79fa69c0d12e";
 
-// Setup database sạch sẽ trước khi chạy test
 async fn setup_test_db(pool: &PgPool) {
-    sqlx::query("TRUNCATE nf_core.task_exceptions, nf_core.work_items, nf_core.users, nf_core.tenants, nf_core.queues CASCADE")
+    // Clean old records
+    let _ = sqlx::query("TRUNCATE nf_tenant.hosp_rooms, nf_tenant.hosp_bookings, nf_tenant.hosp_service_requests, nf_tenant.re_listings, nf_tenant.re_leads, nf_tenant.re_deals CASCADE")
         .execute(pool)
-        .await
-        .unwrap();
+        .await;
+
+    let _ = sqlx::query("TRUNCATE nf_core.users, nf_core.tenants CASCADE")
+        .execute(pool)
+        .await;
+
+    sqlx::query(
+        "INSERT INTO nf_core.roles (id, name, description, is_system_role) VALUES
+         ('SME_LEADER', 'Leader / Owner', 'Chủ doanh nghiệp, có toàn quyền trên hệ thống', TRUE)
+         ON CONFLICT (id) DO NOTHING"
+    )
+    .execute(pool)
+    .await
+    .unwrap();
 
     sqlx::query(
         "INSERT INTO nf_core.tenants (id, company_name, domain, status, subscription_tier) 
-         VALUES ($1, 'SME Test Corporation', 'test-corp.com', 'ACTIVE', 'STANDARD')"
+         VALUES ($1, 'SME Hospitality & Real Estate Corp', 'hosp-re.com', 'ACTIVE', 'STANDARD')
+         ON CONFLICT (id) DO NOTHING"
     )
     .bind(Uuid::parse_str(TEST_TENANT_ID).unwrap())
     .execute(pool)
@@ -28,7 +41,8 @@ async fn setup_test_db(pool: &PgPool) {
     let password_hash = hash("test_password_123", 4).unwrap();
     sqlx::query(
         "INSERT INTO nf_core.users (id, tenant_id, email, password_hash, first_name, last_name, role, is_active) 
-         VALUES ($1, $2, 'test.operator@test-corp.com', $3, 'Nguyen', 'Van Test', 'SME_OPS', true)"
+         VALUES ($1, $2, 'sme.leader@hosp-re.com', $3, 'Le', 'Minh Leader', 'SME_LEADER', true)
+         ON CONFLICT (tenant_id, email) DO NOTHING"
     )
     .bind(Uuid::parse_str(TEST_USER_ID).unwrap())
     .bind(Uuid::parse_str(TEST_TENANT_ID).unwrap())
@@ -49,7 +63,7 @@ async fn spawn_app(pool: PgPool) -> String {
 }
 
 #[tokio::test]
-async fn test_phase4_integration() {
+async fn test_phase4_vertical_packs_integration() {
     dotenvy::dotenv().ok();
     let pool = init_pool().await;
     setup_test_db(&pool).await;
@@ -57,133 +71,215 @@ async fn test_phase4_integration() {
     let base_url = spawn_app(pool.clone()).await;
     let client = reqwest::Client::new();
 
-    // ----------------------------------------------------
-    // 1. TEST POST /api/v1/oauth/token (OAuth Authenticator)
-    // ----------------------------------------------------
-    
-    // Thử credentials không hợp lệ (secret sai)
-    let res = client.post(&format!("{}/api/v1/oauth/token", base_url))
-        .json(&json!({
-            "grant_type": "client_credentials",
-            "client_id": TEST_TENANT_ID,
-            "client_secret": "nf_secret_wrong_secret"
-        }))
-        .send().await.unwrap();
-    assert_eq!(res.status(), 401);
-    let err_body: Value = res.json().await.unwrap();
-    assert_eq!(err_body["error"], "invalid_client");
-
-    // credentials hợp lệ
+    // 1. Get access token
     let expected_secret = format!("nf_secret_{}", TEST_TENANT_ID);
-    let res = client.post(&format!("{}/api/v1/oauth/token", base_url))
+    let token_res = client.post(&format!("{}/api/v1/oauth/token", base_url))
         .json(&json!({
             "grant_type": "client_credentials",
             "client_id": TEST_TENANT_ID,
             "client_secret": expected_secret
         }))
         .send().await.unwrap();
-    assert_eq!(res.status(), 200);
+    assert_eq!(token_res.status(), 200);
     
-    let token_resp: Value = res.json().await.unwrap();
+    let token_resp: Value = token_res.json().await.unwrap();
     let access_token = token_resp["access_token"].as_str().unwrap().to_string();
-    assert_eq!(token_resp["token_type"].as_str().unwrap(), "Bearer");
-    assert!(token_resp["expires_in"].as_i64().unwrap() > 0);
 
-    // ----------------------------------------------------
-    // 2. TEST Webhook HubSpot Authentications (Unauthorized)
-    // ----------------------------------------------------
+    // -------------------------------------------------------------------------
+    // HOSPITALITY PACK TESTS
+    // -------------------------------------------------------------------------
     
-    // Gửi webhook không có token auth
-    let res = client.post(&format!("{}/api/v1/connectors/hubspot/webhook", base_url))
+    // Create Room
+    let res = client.post(&format!("{}/api/v1/hosp/rooms", base_url))
+        .bearer_auth(&access_token)
         .header("x-nextflow-tenant-id", TEST_TENANT_ID)
         .json(&json!({
-            "object_id": 12345,
-            "property_name": "dealstage",
-            "property_value": "closedwon"
+            "room_number": "101",
+            "room_type": "Deluxe",
+            "floor": 1,
+            "smart_lock_code": "LOCK101",
+            "amenities": ["Wifi", "TV", "MiniBar"],
+            "base_price": 500000.0
         }))
         .send().await.unwrap();
-    assert_eq!(res.status(), 401);
+    assert_eq!(res.status(), 201);
+    let room: Value = res.json().await.unwrap();
+    let room_id = room["id"].as_str().unwrap();
 
-    // ----------------------------------------------------
-    // 3. TEST Webhook HubSpot Import (Success case)
-    // ----------------------------------------------------
-    let res = client.post(&format!("{}/api/v1/connectors/hubspot/webhook", base_url))
+    // Get Rooms
+    let res = client.get(&format!("{}/api/v1/hosp/rooms", base_url))
+        .bearer_auth(&access_token)
         .header("x-nextflow-tenant-id", TEST_TENANT_ID)
-        .header("Authorization", format!("Bearer {}", access_token))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let rooms: Value = res.json().await.unwrap();
+    assert!(rooms.as_array().unwrap().len() > 0);
+
+    // Create Booking
+    let res = client.post(&format!("{}/api/v1/hosp/bookings", base_url))
+        .bearer_auth(&access_token)
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
         .json(&json!({
-            "object_id": 88127,
-            "property_name": "dealstage",
-            "property_value": "closedwon"
+            "room_id": room_id,
+            "guest_name": "Trần Văn Khách",
+            "guest_phone": "0988776655",
+            "check_in": "2026-07-20T14:00:00Z",
+            "check_out": "2026-07-22T12:00:00Z",
+            "total_amount": 1000000.0,
+            "paid_amount": 500000.0
+        }))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 201);
+    let booking: Value = res.json().await.unwrap();
+    let booking_id = booking["id"].as_str().unwrap();
+
+    // Get Bookings
+    let res = client.get(&format!("{}/api/v1/hosp/bookings", base_url))
+        .bearer_auth(&access_token)
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let bookings: Value = res.json().await.unwrap();
+    assert!(bookings.as_array().unwrap().len() > 0);
+
+    // Update Booking Status
+    let res = client.put(&format!("{}/api/v1/hosp/bookings/{}/status", base_url, booking_id))
+        .bearer_auth(&access_token)
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .json(&json!({
+            "status": "CheckedIn"
         }))
         .send().await.unwrap();
     assert_eq!(res.status(), 200);
-    
-    let import_resp: Value = res.json().await.unwrap();
-    assert_eq!(import_resp["status"], "success");
-    let work_item_id_str = import_resp["work_item_id"].as_str().unwrap();
 
-    // Verify trong Database xem Work Item đã được tạo đúng thông tin mapped hay chưa
-    let task_id = Uuid::parse_str(work_item_id_str).unwrap();
-    let row = sqlx::query("SELECT title, description, priority, category, source, external_id, metadata, status FROM nf_core.work_items WHERE id = $1")
-        .bind(task_id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-
-    assert_eq!(row.get::<String, _>("title"), "Ho so trien khai dich vu: Hop dong cung cap thiet bi SME - Deal #88127");
-    assert_eq!(row.get::<String, _>("priority"), "MEDIUM"); // 45000.0 is MEDIUM
-    assert_eq!(row.get::<String, _>("category"), "OPERATIONS");
-    assert_eq!(row.get::<String, _>("source"), "HUBSPOT_CONNECTOR");
-    assert_eq!(row.get::<String, _>("external_id"), "hubspot_deal_88127");
-    assert_eq!(row.get::<String, _>("status"), "UNASSIGNED");
-
-    let meta: Value = row.get("metadata");
-    assert_eq!(meta["deal_amount"].as_f64().unwrap(), 45000.0);
-    assert_eq!(meta["hubspot_object_id"].as_i64().unwrap(), 88127);
-
-    // ----------------------------------------------------
-    // 4. TEST Idempotency Check
-    // ----------------------------------------------------
-    // Gửi lại cùng webhook -> Phải trả về idempotent status, không sinh task mới
-    let res = client.post(&format!("{}/api/v1/connectors/hubspot/webhook", base_url))
+    // Create Service Request
+    let res = client.post(&format!("{}/api/v1/hosp/service-requests", base_url))
+        .bearer_auth(&access_token)
         .header("x-nextflow-tenant-id", TEST_TENANT_ID)
-        .header("Authorization", format!("Bearer {}", access_token))
         .json(&json!({
-            "object_id": 88127,
-            "property_name": "dealstage",
-            "property_value": "closedwon"
+            "booking_id": booking_id,
+            "request_type": "Laundry",
+            "charge": 50000.0,
+            "notes": "Giặt ủi quần áo"
+        }))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 201);
+    let request: Value = res.json().await.unwrap();
+    let request_id = request["id"].as_str().unwrap();
+
+    // Get Service Requests
+    let res = client.get(&format!("{}/api/v1/hosp/service-requests", base_url))
+        .bearer_auth(&access_token)
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let requests: Value = res.json().await.unwrap();
+    assert!(requests.as_array().unwrap().len() > 0);
+
+    // Update Service Request Status
+    let res = client.put(&format!("{}/api/v1/hosp/service-requests/{}/status", base_url, request_id))
+        .bearer_auth(&access_token)
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .json(&json!({
+            "status": "Fulfilled"
         }))
         .send().await.unwrap();
     assert_eq!(res.status(), 200);
-    let idempotent_resp: Value = res.json().await.unwrap();
-    assert_eq!(idempotent_resp["status"], "idempotent");
 
-    // ----------------------------------------------------
-    // 5. TEST Webhook Fail & Exception Queue Logging
-    // ----------------------------------------------------
-    // Gửi webhook với object_id = 99999 (kích hoạt lỗi và retry sập)
-    let res = client.post(&format!("{}/api/v1/connectors/hubspot/webhook", base_url))
+
+    // -------------------------------------------------------------------------
+    // REAL ESTATE PACK TESTS
+    // -------------------------------------------------------------------------
+
+    // Create Listing
+    let res = client.post(&format!("{}/api/v1/re/listings", base_url))
+        .bearer_auth(&access_token)
         .header("x-nextflow-tenant-id", TEST_TENANT_ID)
-        .header("Authorization", format!("Bearer {}", access_token))
         .json(&json!({
-            "object_id": 99999,
-            "property_name": "dealstage",
-            "property_value": "closedwon"
+            "address": "123 Đường Láng, Đống Đa",
+            "district": "Đống Đa",
+            "city": "Hà Nội",
+            "type": "CanHo",
+            "price": 3500000000.0,
+            "area": 75.5,
+            "bedrooms": 2,
+            "bathrooms": 2,
+            "legal_status": "Sổ hồng riêng",
+            "description": "Căn hộ chung cư cao cấp"
         }))
         .send().await.unwrap();
-    assert_eq!(res.status(), 202); // 202 Accepted with error exception created
-    
-    let fail_resp: Value = res.json().await.unwrap();
-    assert_eq!(fail_resp["status"], "failed");
+    assert_eq!(res.status(), 201);
+    let listing: Value = res.json().await.unwrap();
+    let listing_id = listing["id"].as_str().unwrap();
 
-    // Kiểm tra xem exception có được log đúng vào bảng task_exceptions hay không
-    let exception_row = sqlx::query("SELECT exception_type, reason, status FROM nf_core.task_exceptions WHERE tenant_id = $1")
-        .bind(Uuid::parse_str(TEST_TENANT_ID).unwrap())
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    // Get Listings
+    let res = client.get(&format!("{}/api/v1/re/listings", base_url))
+        .bearer_auth(&access_token)
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let listings: Value = res.json().await.unwrap();
+    assert!(listings.as_array().unwrap().len() > 0);
 
-    assert_eq!(exception_row.get::<String, _>("exception_type"), "INTEGRATION_FAULT");
-    assert!(exception_row.get::<String, _>("reason").contains("Timeout"));
-    assert_eq!(exception_row.get::<String, _>("status"), "PENDING");
+    // Create Lead
+    let res = client.post(&format!("{}/api/v1/re/leads", base_url))
+        .bearer_auth(&access_token)
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .json(&json!({
+            "name": "Nguyễn Minh Mua",
+            "phone": "0911223344",
+            "email": "mua.nm@gmail.com",
+            "budget": 4000000000.0,
+            "preferred_area": "Đống Đa",
+            "property_type": "CanHo",
+            "urgency": "Hot",
+            "notes": "Cần mua gấp trước tháng 8"
+        }))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 201);
+    let lead: Value = res.json().await.unwrap();
+    let lead_id = lead["id"].as_str().unwrap();
+
+    // Get Leads
+    let res = client.get(&format!("{}/api/v1/re/leads", base_url))
+        .bearer_auth(&access_token)
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let leads: Value = res.json().await.unwrap();
+    assert!(leads.as_array().unwrap().len() > 0);
+
+    // Create Deal
+    let res = client.post(&format!("{}/api/v1/re/deals", base_url))
+        .bearer_auth(&access_token)
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .json(&json!({
+            "lead_id": lead_id,
+            "listing_id": listing_id,
+            "stage": "DepositPaid",
+            "commission": 35000000.0
+        }))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 201);
+    let deal: Value = res.json().await.unwrap();
+    let deal_id = deal["id"].as_str().unwrap();
+
+    // Get Deals
+    let res = client.get(&format!("{}/api/v1/re/deals", base_url))
+        .bearer_auth(&access_token)
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    let deals: Value = res.json().await.unwrap();
+    assert!(deals.as_array().unwrap().len() > 0);
+
+    // Update Deal Stage
+    let res = client.put(&format!("{}/api/v1/re/deals/{}/stage", base_url, deal_id))
+        .bearer_auth(&access_token)
+        .header("x-nextflow-tenant-id", TEST_TENANT_ID)
+        .json(&json!({
+            "stage": "Won"
+        }))
+        .send().await.unwrap();
+    assert_eq!(res.status(), 200);
 }

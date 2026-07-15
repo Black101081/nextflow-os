@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from '../../shared/contexts/AuthContext';
 import ProtectedRoute from '../../shared/components/ProtectedRoute';
 import Login from '../../shared/pages/Login';
+import NotFound from '../../shared/pages/NotFound';
 
 import SmeStaffLayout from './layouts/SmeStaffLayout';
 import TenantStaffWorkspace from './pages/TenantStaffWorkspace';
@@ -31,7 +32,7 @@ export default function App() {
           </Route>
 
           <Route path="/" element={<Navigate to="/staff/workspace" replace />} />
-          <Route path="*" element={<div>404 Not Found</div>} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Router>
     </AuthProvider>

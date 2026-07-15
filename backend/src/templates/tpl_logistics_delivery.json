@@ -1,0 +1,93 @@
+{
+    "id": "tpl_logistics_delivery",
+    "name": "Logistics & Delivery Fleet",
+    "description": "Quản lý Vận đơn, Điều phối xe tải, Giao nhận Last-mile, Theo dõi dòng tiền COD.",
+    "category": "logistics",
+    "policies": [
+        {
+            "name": "SLA - Tỉ lệ Giao thành công",
+            "description": "Đơn hàng phải được giao thành công hoặc báo lý do trong 24h từ lúc xuất kho.",
+            "target_type": "completion",
+            "target_value": "86400",
+            "action": "escalate_to_manager"
+        }
+    ],
+    "queues": [
+        {
+            "name": "Điều phối Fleet",
+            "description": "Gắn chuyến, theo dõi tài xế",
+            "priority": 1,
+            "color": "green",
+            "icon": "Truck"
+        }
+    ],
+    "sops": [
+        {
+            "title": "SOP Thu hộ COD",
+            "content": "## Quy trình nộp COD\n1. Tài xế thu tiền mặt từ khách.\n2. Cuối ca, tài xế mang nộp tại quỹ hoặc chuyển khoản VietQR.\n3. Quản lý xác nhận COD đã thu, đối soát với hệ thống."
+        }
+    ],
+    "connectors": [],
+    "entities": [
+        {
+            "name": "Vận đơn (Waybill)",
+            "system_name": "logistics_waybill",
+            "description": "Thông tin Vận đơn giao hàng",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "trackingCode": {
+                        "type": "string"
+                    },
+                    "receiverName": {
+                        "type": "string"
+                    },
+                    "codAmount": {
+                        "type": "number"
+                    },
+                    "deliveryStatus": {
+                        "type": "string",
+                        "enum": [
+                            "PENDING",
+                            "IN_TRANSIT",
+                            "DELIVERED",
+                            "FAILED"
+                        ]
+                    }
+                }
+            }
+        }
+    ],
+    "workflows": [
+        {
+            "name": "Xác nhận COD bằng AI",
+            "trigger_event": "entity.logistics_waybill.updated",
+            "dag": {
+                "workflow_id": "00000000-0000-0000-0000-log000000001",
+                "nodes": [
+                    {
+                        "id": "trigger",
+                        "name": "Cập nhật Vận đơn",
+                        "type": "Trigger",
+                        "event_name": "entity.logistics_waybill.updated"
+                    },
+                    {
+                        "id": "blockchain_cod",
+                        "name": "Ghi nhận Transaction COD",
+                        "type": "BlockchainAnchor",
+                        "data_payload": {
+                            "tracking": "{{payload.trackingCode}}",
+                            "cod": "{{payload.codAmount}}"
+                        }
+                    }
+                ],
+                "edges": [
+                    {
+                        "source_id": "trigger",
+                        "target_id": "blockchain_cod"
+                    }
+                ]
+            }
+        }
+    ]
+}

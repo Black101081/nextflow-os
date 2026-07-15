@@ -2,66 +2,87 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use regex::Regex;
+use std::sync::{Arc, OnceLock};
+use tokio::sync::RwLock;
 
-/// Các loại Nút (Node) có thể có trong một Workflow
+/// Định nghĩa một kết nối giữa các node theo chuẩn N8N JSON
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "type")]
-pub enum NodeType {
-    /// Bắt đầu quy trình (VD: "Khi một hóa đơn được tạo")
-    Trigger { event_name: String },
-    
-    /// Rẽ nhánh điều kiện (VD: "Nếu tổng tiền > 10.000")
-    Condition { field: String, operator: String, value: Value },
-    
-    /// Cập nhật dữ liệu vào một trường JSONB
-    UpdateData { field: String, value: Value },
-    
-    /// Các khối AI / Trí tuệ nhân tạo (Built-in Magic Node)
-    AiPredict { model: String, prompt_template: String },
-    
-    /// Các khối Blockchain (Built-in Magic Node)
-    BlockchainAnchor { data_payload: Value },
-    
-    /// Webhook đẩy dữ liệu ra hệ thống ngoài
-    WebhookCall { url: String, method: String },
-    
-    /// Gửi tin nhắn Zalo ZNS
-    ZaloZNSNode { phone_number: String, template_id: String, template_data: Value },
+pub struct N8nConnection {
+    pub node: String,      // Tên (hoặc ID) của Node đích
+    pub r#type: String,    // Loại kết nối (main)
+    pub index: usize,      // Vị trí cổng (port)
 }
 
-/// Một Nút trong Đồ thị Workflow
+/// Định nghĩa một Nút theo chuẩn N8N JSON
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct WorkflowNode {
+#[serde(rename_all = "camelCase")]
+pub struct N8nNode {
     pub id: String,
     pub name: String,
-    #[serde(flatten)]
-    pub node_type: NodeType,
+    pub r#type: String,    // Ví dụ: "n8n-nodes-base.httpRequest"
+    #[serde(default)]
+    pub type_version: f64,
+    #[serde(default)]
+    pub position: [f64; 2],
+    #[serde(default)]
+    pub parameters: Value,
 }
 
-/// Giao tiếp giữa 2 Nút (Cạnh của đồ thị)
+/// Định nghĩa toàn bộ Workflow theo chuẩn N8N JSON
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct WorkflowEdge {
-    pub source_id: String,
-    pub target_id: String,
-    /// Dùng cho các nút Condition để quyết định nhánh True / False
-    pub condition_outcome: Option<bool>,
+#[serde(rename_all = "camelCase")]
+pub struct N8nWorkflow {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub nodes: Vec<N8nNode>,
+    #[serde(default)]
+    // Map<SourceNodeName, Map<ConnectionType(main), List<List<Connection>>>>
+    pub connections: HashMap<String, HashMap<String, Vec<Vec<N8nConnection>>>>,
 }
 
-/// Định nghĩa toàn bộ một Workflow (Đồ thị DAG)
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct WorkflowDag {
-    pub workflow_id: uuid::Uuid,
-    pub nodes: Vec<WorkflowNode>,
-    pub edges: Vec<WorkflowEdge>,
+/// Global In-Memory Cache cho Workflow DAGs
+static WORKFLOW_REGISTRY: OnceLock<Arc<RwLock<HashMap<String, N8nWorkflow>>>> = OnceLock::new();
+
+pub fn get_workflow_registry() -> Arc<RwLock<HashMap<String, N8nWorkflow>>> {
+    WORKFLOW_REGISTRY.get_or_init(|| Arc::new(RwLock::new(HashMap::new()))).clone()
 }
 
-/// Kết quả trả về của một Node bất kỳ
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct NodeResult {
-    pub status: String,
-    pub data: Option<Value>,
-    pub error_code: Option<String>,
-    pub message: Option<String>,
+/// Lắng nghe tín hiệu từ DB và nạp lại toàn bộ Workflow lên RAM
+pub async fn reload_all_workflows(pool: &sqlx::PgPool) -> Result<(), String> {
+    println!("[Workflow Engine N8N] Reloading workflows into RAM...");
+    let query = r#"
+        SELECT tenant_id, trigger_event, dag_json 
+        FROM nf_meta.workflow_definitions 
+        WHERE is_active = true
+    "#;
+    
+    use sqlx::Row;
+    let rows = sqlx::query(query)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("DB Error: {}", e))?;
+        
+    let mut new_cache = HashMap::new();
+    for r in rows {
+        let t_id: uuid::Uuid = r.get("tenant_id");
+        let ev: String = r.get("trigger_event");
+        let dag_json: Value = r.get("dag_json");
+        
+        // Cố gắng parse JSON thành chuẩn N8N
+        if let Ok(dag) = serde_json::from_value::<N8nWorkflow>(dag_json) {
+            let key = format!("{}:{}", t_id, ev);
+            new_cache.insert(key, dag);
+        } else {
+            println!("[Workflow Engine N8N] Warning: Could not parse workflow {}:{} to N8N schema. Backward compatibility disabled.", t_id, ev);
+        }
+    }
+    
+    let registry = get_workflow_registry();
+    let mut cache = registry.write().await;
+    *cache = new_cache;
+    println!("[Workflow Engine N8N] Successfully loaded {} active workflows to RAM.", cache.len());
+    Ok(())
 }
 
 /// Ngữ cảnh chạy của một Workflow, chứa dữ liệu thay đổi qua từng Node
@@ -71,7 +92,6 @@ pub struct ExecutionContext {
 }
 
 impl ExecutionContext {
-    /// Lấy giá trị biến theo đường dẫn (Ví dụ: "payload.patient_name")
     pub fn get_value_by_path(&self, path: &str) -> Option<Value> {
         let parts: Vec<&str> = path.split('.').collect();
         if parts.is_empty() { return None; }
@@ -87,7 +107,6 @@ impl ExecutionContext {
         Some(current_val.clone())
     }
 
-    /// Nội suy biến: Thay thế `${{ key.path }}` bằng giá trị thực
     pub fn interpolate_string(&self, template: &str) -> String {
         static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
         let re = RE.get_or_init(|| Regex::new(r"\$\{\{\s*([^}]+)\s*\}\}").unwrap());
@@ -96,162 +115,186 @@ impl ExecutionContext {
             match self.get_value_by_path(path) {
                 Some(Value::String(s)) => s,
                 Some(v) => v.to_string(),
-                None => format!("${{{}}}", path), // Giữ nguyên nếu không tìm thấy
+                None => format!("${{{}}}", path),
             }
         }).to_string()
     }
 }
 
-/// Cỗ máy chạy Workflow chính
+/// Cỗ máy chạy N8N Workflow
 pub struct WorkflowRunner {
-    pub dag: WorkflowDag,
+    pub workflow: N8nWorkflow,
 }
 
 impl WorkflowRunner {
-    pub fn new(dag: WorkflowDag) -> Self {
-        Self { dag }
+    pub fn new(workflow: N8nWorkflow) -> Self {
+        Self { workflow }
     }
 
-    /// Khởi chạy Workflow từ Nút Trigger
-    pub async fn execute(&self, initial_payload: Value) -> Result<ExecutionContext, String> {
+    /// Khởi chạy Workflow từ Nút Webhook/Trigger đầu tiên
+    pub async fn execute(&self, pool: sqlx::PgPool, tenant_id: uuid::Uuid, initial_payload: Value) -> Result<ExecutionContext, String> {
         let mut context = ExecutionContext::default();
         context.variables.insert("payload".to_string(), initial_payload);
 
-        // Tìm Nút bắt đầu (Trigger Node)
-        let trigger_node = self.dag.nodes.iter().find(|n| matches!(n.node_type, NodeType::Trigger { .. }));
+        // Tìm Nút bắt đầu (Trigger Node) - chuẩn N8N có thể là n8n-nodes-base.webhook
+        let trigger_node = self.workflow.nodes.iter().find(|n| {
+            n.r#type.contains("webhook") || n.r#type.contains("trigger")
+        });
         
-        let mut current_node_id = match trigger_node {
-            Some(n) => n.id.clone(),
-            None => return Err("Workflow không có Trigger Node!".to_string()),
+        let mut current_node_name = match trigger_node {
+            Some(n) => n.name.clone(),
+            None => return Err("N8N Workflow không có Webhook/Trigger Node!".to_string()),
         };
 
-        // Vòng lặp duyệt Đồ thị có hướng (DAG Execution Loop)
+        // Vòng lặp duyệt Đồ thị theo chuẩn n8n
         loop {
-            let node = self.dag.nodes.iter().find(|n| n.id == current_node_id)
-                .ok_or_else(|| format!("Lỗi đồ thị: Không tìm thấy node {}", current_node_id))?;
+            let node = self.workflow.nodes.iter().find(|n| n.name == current_node_name)
+                .ok_or_else(|| format!("Lỗi đồ thị: Không tìm thấy node {}", current_node_name))?;
 
             // 1. Thực thi Node hiện tại
-            let outcome = self.execute_node(node, &mut context).await?;
+            let outcome_port = self.execute_node(node, &mut context, &pool, tenant_id).await?;
 
-            // 2. Tìm Node tiếp theo dựa trên kết quả (Edges)
-            let next_edge = self.dag.edges.iter().find(|e| {
-                e.source_id == current_node_id && (e.condition_outcome.is_none() || e.condition_outcome == outcome)
-            });
-
-            match next_edge {
-                Some(edge) => current_node_id = edge.target_id.clone(),
-                None => break, // Không còn nút nào tiếp theo -> Kết thúc quy trình
+            // 2. Tìm Node tiếp theo thông qua connections dict của n8n
+            // Cấu trúc connections: { "Node Tên": { "main": [ [Connection Port 0], [Connection Port 1] ] } }
+            if let Some(node_connections) = self.workflow.connections.get(&current_node_name) {
+                if let Some(main_connections) = node_connections.get("main") {
+                    // Chọn cổng output (outcome_port) tương ứng (default 0)
+                    if outcome_port < main_connections.len() {
+                        let next_nodes = &main_connections[outcome_port];
+                        if !next_nodes.is_empty() {
+                            // Chuyển sang node kế tiếp (đơn giản hóa: chỉ lấy node đầu tiên của cổng)
+                            current_node_name = next_nodes[0].node.clone();
+                            continue;
+                        }
+                    }
+                }
             }
+            
+            // Không còn node nào tiếp theo
+            break;
         }
 
         Ok(context)
     }
 
-    /// Thực thi Logic nghiệp vụ của từng loại Nút (Node)
-    async fn execute_node(&self, node: &WorkflowNode, context: &mut ExecutionContext) -> Result<Option<bool>, String> {
-        match &node.node_type {
-            NodeType::Trigger { event_name } => {
-                println!("[Workflow] Triggered by event: {}", event_name);
-                Ok(None)
+    /// Thực thi Logic nghiệp vụ của từng loại Nút (Node) theo type của n8n
+    async fn execute_node(&self, node: &N8nNode, context: &mut ExecutionContext, pool: &sqlx::PgPool, tenant_id: uuid::Uuid) -> Result<usize, String> {
+        match node.r#type.as_str() {
+            "n8n-nodes-base.webhook" | "n8n-nodes-base.trigger" => {
+                println!("[Workflow N8N] Triggered node: {}", node.name);
+                Ok(0) // Luôn đi tiếp cổng 0
             }
-            NodeType::Condition { field, operator, value } => {
-                // 1. Nội suy biến
-                let actual_field_val = context.interpolate_string(field);
-                let actual_compare_val = if let Value::String(s) = value {
-                    context.interpolate_string(s)
-                } else {
-                    value.to_string()
-                };
-
-                println!("[Workflow] Evaluating Condition: '{}' {} '{}'", actual_field_val, operator, actual_compare_val);
+            
+            "n8n-nodes-base.if" => {
+                // Đọc parameters: { conditions: { string: [{ value1, operation, value2 }] } }
+                // Đơn giản hóa quá trình parse:
+                let params = &node.parameters;
+                let v1 = params.get("value1").and_then(|v| v.as_str()).unwrap_or("");
+                let op = params.get("operation").and_then(|v| v.as_str()).unwrap_or("equal");
+                let v2 = params.get("value2").and_then(|v| v.as_str()).unwrap_or("");
                 
-                // 2. Logic so sánh thực tế
-                let outcome = match operator.as_str() {
-                    "==" => actual_field_val == actual_compare_val,
-                    "!=" => actual_field_val != actual_compare_val,
-                    ">" => {
-                        let a: f64 = actual_field_val.parse().unwrap_or(0.0);
-                        let b: f64 = actual_compare_val.parse().unwrap_or(0.0);
-                        a > b
-                    },
-                    "<" => {
-                        let a: f64 = actual_field_val.parse().unwrap_or(0.0);
-                        let b: f64 = actual_compare_val.parse().unwrap_or(0.0);
-                        a < b
-                    },
-                    "contains" => actual_field_val.contains(&actual_compare_val),
+                let actual_v1 = context.interpolate_string(v1);
+                let actual_v2 = context.interpolate_string(v2);
+
+                println!("[Workflow N8N] IF Condition: '{}' {} '{}'", actual_v1, op, actual_v2);
+                
+                let is_true = match op {
+                    "equal" | "==" => actual_v1 == actual_v2,
+                    "notEqual" | "!=" => actual_v1 != actual_v2,
+                    "contains" => actual_v1.contains(&actual_v2),
                     _ => false,
                 };
                 
-                Ok(Some(outcome)) 
+                // N8n If Node: cổng 0 là True, cổng 1 là False
+                if is_true { Ok(0) } else { Ok(1) }
             }
-            NodeType::UpdateData { field, value } => {
-                let actual_val = if let Value::String(s) = value {
-                    Value::String(context.interpolate_string(s))
-                } else {
-                    value.clone()
-                };
-                println!("[Workflow] Action: Updating field '{}' to {}", field, actual_val);
-                context.variables.insert(field.clone(), actual_val);
-                Ok(None)
-            }
-            NodeType::AiPredict { model, prompt_template } => {
-                let actual_prompt = context.interpolate_string(prompt_template);
-                println!("[Workflow] Magic AI Node: Running model {} with prompt: {}", model, actual_prompt);
+            
+            "n8n-nodes-base.set" => {
+                // Đọc parameters
+                let field = node.parameters.get("field").and_then(|v| v.as_str()).unwrap_or("unknown_field");
+                let value_str = node.parameters.get("value").and_then(|v| v.as_str()).unwrap_or("");
                 
-                // Simulate AI Auto-Triage extraction from unstructured text
-                let priority_pred = if actual_prompt.to_lowercase().contains("khẩn cấp") || actual_prompt.to_lowercase().contains("urgent") {
-                    "HIGH"
-                } else {
-                    "NORMAL"
+                let actual_val = context.interpolate_string(value_str);
+                println!("[Workflow N8N] SET Action: Updating field '{}' to {}", field, actual_val);
+                
+                context.variables.insert(field.to_string(), Value::String(actual_val));
+                Ok(0)
+            }
+            
+            "n8n-nodes-base.httpRequest" => {
+                let url = node.parameters.get("url").and_then(|v| v.as_str()).unwrap_or("");
+                let method = node.parameters.get("method").and_then(|v| v.as_str()).unwrap_or("GET");
+                
+                let actual_url = context.interpolate_string(url);
+                println!("[Workflow N8N] HTTP Action: Calling external {} {}", method, actual_url);
+                
+                Ok(0)
+            }
+            
+            "nextflow.aiPredict" => {
+                let model = node.parameters.get("model").and_then(|v| v.as_str()).unwrap_or("gpt-3.5");
+                let prompt = node.parameters.get("prompt").and_then(|v| v.as_str()).unwrap_or("");
+                
+                let actual_prompt = context.interpolate_string(prompt);
+                println!("[Workflow N8N] AI Node: Running model {} with prompt: {}", model, actual_prompt);
+                
+                // Call real AI service using reqwest
+                let client = reqwest::Client::new();
+                let res = client.post("http://nextflow-ai-service:8001/predict")
+                    .json(&serde_json::json!({
+                        "model": model,
+                        "prompt": actual_prompt
+                    }))
+                    .send()
+                    .await;
+                
+                let ai_result = match res {
+                    Ok(resp) if resp.status().is_success() => {
+                        let json: Value = resp.json().await.unwrap_or_default();
+                        json
+                    },
+                    _ => {
+                        serde_json::json!({
+                            "error": "AI Service unavailable, using fallback"
+                        })
+                    }
                 };
 
-                let category_pred = if actual_prompt.to_lowercase().contains("hoá đơn") || actual_prompt.to_lowercase().contains("vat") || actual_prompt.to_lowercase().contains("thanh toán") {
-                    "FINANCE"
-                } else {
-                    "OPERATIONS"
-                };
-
-                let ai_result = serde_json::json!({
-                    "predicted_priority": priority_pred,
-                    "predicted_category": category_pred,
-                    "confidence_score": 0.92,
-                    "model_used": model,
-                    "rationale": format!("Extracted from prompt text using model {}", model)
-                });
-
-                // Lưu kết quả theo ID của Node vào context
                 let res_key = format!("node_{}", node.id);
                 context.variables.insert(res_key, ai_result);
-                
-                println!("[Workflow] AI Result: Priority={}, Category={}", priority_pred, category_pred);
-                Ok(None)
+                Ok(0)
             }
-            NodeType::BlockchainAnchor { data_payload: _ } => {
-                println!("[Workflow] Magic Blockchain Node: Anchoring data...");
-                // Calculate a mock hash of the current payload
-                let hash = crate::services::blockchain::compute_invoice_data_hash(
-                    uuid::Uuid::new_v4(), // Mock ID for now
-                    100.0,
-                    "USD",
-                    "COMPLETED"
-                );
-                let tx_hash = crate::services::blockchain::anchor_data_on_chain(&hash).await;
+            
+            "nextflow.blockchainAnchor" => {
+                let data_str = node.parameters.get("dataPayload").and_then(|v| v.as_str()).unwrap_or("");
+                
+                println!("[Workflow N8N] Blockchain Node: Anchoring data...");
+                let actual_str = context.interpolate_string(data_str);
+                let payload_val = serde_json::from_str(&actual_str).unwrap_or(Value::String(actual_str));
+                
+                let hash_target = context.get_value_by_path("payload").unwrap_or(payload_val);
+                
+                let hash = crate::services::blockchain::compute_data_hash(&hash_target);
+                let tx_hash = crate::services::blockchain::anchor_data_on_chain(pool, tenant_id, &hash, &hash_target).await;
                 
                 let res_key = format!("node_{}", node.id);
                 context.variables.insert(res_key, Value::String(tx_hash));
-                Ok(None)
+                Ok(0)
             }
-            NodeType::WebhookCall { url, method } => {
-                let actual_url = context.interpolate_string(url);
-                println!("[Workflow] Action: Calling external Webhook {} {}", method, actual_url);
-                Ok(None)
+            
+            "nextflow.zaloZNS" => {
+                let phone = node.parameters.get("phone").and_then(|v| v.as_str()).unwrap_or("");
+                let template = node.parameters.get("templateId").and_then(|v| v.as_str()).unwrap_or("");
+                
+                let actual_phone = context.interpolate_string(phone);
+                let actual_template = context.interpolate_string(template);
+                println!("[Workflow N8N] Action: Sending Zalo ZNS to {}, template: {}", actual_phone, actual_template);
+                Ok(0)
             }
-            NodeType::ZaloZNSNode { phone_number, template_id, template_data } => {
-                let actual_phone = context.interpolate_string(phone_number);
-                let actual_template = context.interpolate_string(template_id);
-                println!("[Workflow] Action: Sending Zalo ZNS to {}, template: {}", actual_phone, actual_template);
-                Ok(None)
+            
+            _ => {
+                println!("[Workflow N8N] Unknown Node Type: {}", node.r#type);
+                Ok(0)
             }
         }
     }
@@ -264,44 +307,34 @@ pub async fn trigger_workflow_for_event(
     event_name: &str,
     payload: Value,
 ) -> Result<(), String> {
-    // Tìm cấu hình Workflow từ DB
-    let query = r#"
-        SELECT dag_json 
-        FROM nf_meta.workflow_definitions 
-        WHERE tenant_id = $1 AND trigger_event = $2 AND is_active = true
-        LIMIT 1
-    "#;
+    let key = format!("{}:{}", tenant_id, event_name);
+    
+    // Đọc từ In-Memory Cache (RAM) thay vì truy vấn DB
+    let registry = get_workflow_registry();
+    let wf_opt = {
+        let cache = registry.read().await;
+        cache.get(&key).cloned()
+    };
 
-    use sqlx::Row;
-    let row = sqlx::query(query)
-        .bind(tenant_id)
-        .bind(event_name)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| format!("DB Error: {}", e))?;
-
-    if let Some(r) = row {
-        let dag_json: Value = r.get("dag_json");
-        let dag: WorkflowDag = serde_json::from_value(dag_json)
-            .map_err(|e| format!("Invalid DAG JSON: {}", e))?;
-
-        println!("[Workflow Engine] Found active workflow for event '{}'. Triggering...", event_name);
+    if let Some(workflow) = wf_opt {
+        println!("[Workflow Engine N8N] Found active N8N workflow for event '{}'. Triggering Background Async Task...", event_name);
         
-        let runner = WorkflowRunner::new(dag);
-        // Trong hệ thống thực tế, ta nên đẩy cái này vào background task (VD: tokio::spawn)
-        // Ở đây chạy await luôn để demo.
-        match runner.execute(payload).await {
-            Ok(context) => {
-                println!("[Workflow Engine] Workflow completed successfully. Context: {:?}", context.variables.keys());
+        let runner = WorkflowRunner::new(workflow);
+        let pool_clone = pool.clone();
+        
+        tokio::spawn(async move {
+            match runner.execute(pool_clone, tenant_id, payload).await {
+                Ok(context) => {
+                    println!("[Workflow Engine N8N] Background Workflow completed successfully. Context Keys: {:?}", context.variables.keys());
+                }
+                Err(e) => {
+                    println!("[Workflow Engine N8N] Background Workflow failed: {}", e);
+                }
             }
-            Err(e) => {
-                println!("[Workflow Engine] Workflow failed: {}", e);
-            }
-        }
+        });
     } else {
-        println!("[Workflow Engine] No active workflow found for event '{}'", event_name);
+        println!("[Workflow Engine N8N] No active workflow found in RAM for event '{}'", event_name);
     }
 
     Ok(())
 }
-

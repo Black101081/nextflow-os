@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/
 
 # Copy binary từ builder
 COPY --from=builder /app/target/release/nextflow-core-backend /app/nextflow-core-backend
+COPY --from=builder /app/src/templates /app/src/templates
 
 # Copy tệp môi trường .env (nếu có) hoặc dùng ENV trong docker-compose
 EXPOSE 8000

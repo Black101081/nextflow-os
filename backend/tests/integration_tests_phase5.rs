@@ -18,6 +18,16 @@ async fn setup_analytics_test_db(pool: &PgPool) {
     sqlx::query("TRUNCATE nf_core.task_exceptions, nf_core.work_items, nf_core.users, nf_core.queues, nf_core.tenants CASCADE")
         .execute(pool).await.unwrap();
 
+    sqlx::query(
+        "INSERT INTO nf_core.roles (id, name, description, is_system_role) VALUES
+         ('SME_LEADER', 'Leader / Owner', 'Chủ doanh nghiệp, có toàn quyền trên hệ thống', TRUE),
+         ('SME_SUPERVISOR', 'Supervisor / Manager', 'Quản lý, có quyền phân việc và xem báo cáo vận hành', TRUE),
+         ('SME_OPS', 'Operator / Staff', 'Nhân viên văn phòng, xử lý công việc', TRUE),
+         ('FIELD_WORKER', 'Field Worker', 'Nhân viên hiện trường', TRUE)
+         ON CONFLICT (id) DO NOTHING"
+    )
+    .execute(pool).await.unwrap();
+
     // Seed tenant — CDC trigger sẽ tự sync vào dim_tenant
     sqlx::query(
         "INSERT INTO nf_core.tenants (id, company_name, domain, status, subscription_tier)

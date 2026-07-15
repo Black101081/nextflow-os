@@ -33,8 +33,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
       
       if (isLocal && (port === '8081' || port === '8082' || port === '8083')) {
-        let tenantId = 'd290f1ee-6c54-4b01-90e6-d701748f0851';
-        let secret = 'nf_live_test_d290f1ee-6c54-4b01-90e6-d701748f0851';
+        let tenantId = '4cd5f972-39b5-4786-97b6-32a4a081d859';
+        let secret = 'nf_live_test_4cd5f972-39b5-4786-97b6-32a4a081d859';
         
         if (port === '8081') {
           tenantId = 'ffffffff-ffff-ffff-ffff-ffffffffffff';

@@ -1,0 +1,42 @@
+{
+    "id": "tpl_micro_manufacturing",
+    "name": "Micro-Manufacturing Pack",
+    "description": "Giải pháp chuẩn hóa cho ngành Micro-Manufacturing.",
+    "category": "manufacturing",
+    "policies": [],
+    "queues": [
+        {
+            "name": "Operations",
+            "description": "Xử lý nghiệp vụ chính",
+            "priority": 1,
+            "color": "gray",
+            "icon": "Settings"
+        }
+    ],
+    "sops": [
+        {
+            "title": "SOP Cơ bản",
+            "content": "Quy trình vận hành tiêu chuẩn ngành Micro-Manufacturing."
+        }
+    ],
+    "connectors": [],
+    "entities": [
+        {
+            "name": "Hồ sơ Micro-Manufacturing",
+            "system_name": "record_tpl_micro_manufacturing",
+            "description": "Lưu trữ dữ liệu lõi",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    ],
+    "workflows": []
+}

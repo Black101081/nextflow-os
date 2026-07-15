@@ -1,0 +1,98 @@
+{
+    "id": "tpl_edu_training",
+    "name": "Edu & Training Standard",
+    "description": "Quản lý Trung tâm ngoại ngữ, Kỹ năng: Học viên, Xếp lịch học, Điểm danh, Đánh giá giáo viên.",
+    "category": "edu",
+    "policies": [
+        {
+            "name": "SLA - Xử lý Vắng mặt",
+            "description": "Giáo vụ phải gọi điện hỏi thăm học viên vắng mặt không phép trong vòng 2 giờ.",
+            "target_type": "completion",
+            "target_value": "7200",
+            "action": "escalate"
+        }
+    ],
+    "queues": [
+        {
+            "name": "Phòng Giáo vụ",
+            "description": "Điểm danh, Sắp xếp lịch học, Support học viên",
+            "priority": 1,
+            "color": "blue",
+            "icon": "Book"
+        }
+    ],
+    "sops": [
+        {
+            "title": "SOP Xử lý vắng mặt",
+            "content": "## Quy định Vắng mặt\n1. Check điểm danh trên hệ thống sau 15p vào lớp.\n2. Lọc danh sách vắng không phép.\n3. Gọi điện cho Phụ huynh/Học viên để báo và hỏi thăm.\n4. Cập nhật lý do vào hệ thống CRM."
+        }
+    ],
+    "connectors": [
+        {
+            "name": "zalo_oa",
+            "settings": {
+                "enable_zns": true
+            }
+        }
+    ],
+    "entities": [
+        {
+            "name": "Sổ Điểm danh (Attendance)",
+            "system_name": "attendance_record",
+            "description": "Quản lý điểm danh hàng ngày",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "studentId": {
+                        "type": "string"
+                    },
+                    "classId": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "PRESENT",
+                            "ABSENT",
+                            "LATE"
+                        ]
+                    },
+                    "reason": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    ],
+    "workflows": [
+        {
+            "name": "Cảnh báo vắng mặt tự động",
+            "trigger_event": "entity.attendance_record.created",
+            "dag": {
+                "workflow_id": "00000000-0000-0000-0000-edu000000001",
+                "nodes": [
+                    {
+                        "id": "trigger",
+                        "name": "Ghi nhận điểm danh",
+                        "type": "Trigger",
+                        "event_name": "entity.attendance_record.created"
+                    },
+                    {
+                        "id": "zalo_absent",
+                        "name": "Báo phụ huynh qua Zalo",
+                        "type": "ZaloZNSNode",
+                        "phone_number": "{{payload.parentPhone}}",
+                        "template_id": "edu_absent_alert",
+                        "template_data": {}
+                    }
+                ],
+                "edges": [
+                    {
+                        "source_id": "trigger",
+                        "target_id": "zalo_absent"
+                    }
+                ]
+            }
+        }
+    ]
+}

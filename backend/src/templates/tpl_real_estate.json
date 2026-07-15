@@ -1,0 +1,92 @@
+{
+    "id": "tpl_real_estate",
+    "name": "Real Estate Agency Pro",
+    "description": "Giải pháp toàn diện cho sàn Bất Động Sản: Quản lý Bảng hàng, Leads, Hợp đồng cọc, Hoa hồng môi giới.",
+    "category": "real_estate",
+    "policies": [
+        {
+            "name": "SLA - Phân bổ Lead",
+            "description": "Lead mới từ Marketing đổ về phải được Sales gọi trong vòng 15 phút.",
+            "target_type": "completion",
+            "target_value": "900",
+            "action": "reassign_lead"
+        }
+    ],
+    "queues": [
+        {
+            "name": "Sales BĐS",
+            "description": "Chăm sóc khách hàng, tư vấn dự án",
+            "priority": 1,
+            "color": "orange",
+            "icon": "Building"
+        }
+    ],
+    "sops": [
+        {
+            "title": "SOP Tư vấn Dự án",
+            "content": "## Chuẩn bị Tư vấn\n1. Nắm rõ layout, pháp lý dự án.\n2. Gửi file PDF Sa Bàn ảo cho khách.\n3. Hẹn lịch site tour xem thực tế.\n4. Báo giá và tiến độ thanh toán."
+        }
+    ],
+    "connectors": [],
+    "entities": [
+        {
+            "name": "Bảng hàng BĐS (Property)",
+            "system_name": "real_estate_property",
+            "description": "Quản lý kho Bất động sản (Căn hộ, Đất nền)",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "projectCode": {
+                        "type": "string"
+                    },
+                    "unitCode": {
+                        "type": "string"
+                    },
+                    "priceVND": {
+                        "type": "number"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "AVAILABLE",
+                            "DEPOSITED",
+                            "SOLD"
+                        ]
+                    }
+                }
+            }
+        }
+    ],
+    "workflows": [
+        {
+            "name": "Ghi nhận Hợp đồng Cọc",
+            "trigger_event": "entity.real_estate_property.updated",
+            "dag": {
+                "workflow_id": "00000000-0000-0000-0000-bds000000001",
+                "nodes": [
+                    {
+                        "id": "trigger",
+                        "name": "Cập nhật trạng thái BĐS",
+                        "type": "Trigger",
+                        "event_name": "entity.real_estate_property.updated"
+                    },
+                    {
+                        "id": "blockchain_deposit",
+                        "name": "Neo Hợp đồng Cọc lên Blockchain",
+                        "type": "BlockchainAnchor",
+                        "data_payload": {
+                            "unit": "{{payload.unitCode}}",
+                            "status": "{{payload.status}}"
+                        }
+                    }
+                ],
+                "edges": [
+                    {
+                        "source_id": "trigger",
+                        "target_id": "blockchain_deposit"
+                    }
+                ]
+            }
+        }
+    ]
+}

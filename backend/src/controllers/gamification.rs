@@ -92,33 +92,28 @@ pub async fn get_my_points(
     State(state): State<AppState>,
     tenant: TenantIsolation,
 ) -> Response {
-    // Ideally we extract user_id from claims.
-    // For now, let's get the first user of the tenant if user_id is not passed?
-    // Wait, the frontend will call this API, but without user_id in the claims yet because TenantIsolation only gives tenant_id.
-    // Let's just fetch all point transactions for the tenant, or assume the user wants their own points.
-    // Since we don't have user_id from token yet, let's just return a mock or get the top user.
-    // Actually, we can get the points for a specific user ID via query param or just return the total points for the first SME_OPS user.
-    // Let's implement it for the current tenant's first SME_OPS or SME_LEADER.
-    let user_query = r#"
-        SELECT id FROM nf_core.users WHERE tenant_id = $1 ORDER BY created_at ASC LIMIT 1
-    "#;
-    
-    let user_id: Option<Uuid> = match sqlx::query_scalar(user_query)
-        .bind(tenant.tenant_id)
-        .fetch_optional(&state.pool)
-        .await {
-            Ok(Some(id)) => Some(id),
-            _ => None
-        };
-
-    if user_id.is_none() {
-        return (StatusCode::OK, Json(UserPointsInfo {
-            total_points: 0,
-            current_tier: "Bronze".to_string(),
-            transactions: vec![],
-        })).into_response();
-    }
-    let user_id = user_id.unwrap();
+    let user_id = match tenant.user_id {
+        Some(uid) => uid,
+        None => {
+            let user_query = r#"
+                SELECT id FROM nf_core.users WHERE tenant_id = $1 ORDER BY created_at ASC LIMIT 1
+            "#;
+            match sqlx::query_scalar(user_query)
+                .bind(tenant.tenant_id)
+                .fetch_optional(&state.pool)
+                .await
+            {
+                Ok(Some(id)) => id,
+                _ => {
+                    return (StatusCode::OK, Json(UserPointsInfo {
+                        total_points: 0,
+                        current_tier: "Bronze".to_string(),
+                        transactions: vec![],
+                    })).into_response();
+                }
+            }
+        }
+    };
 
     let points_row = sqlx::query(r#"
         SELECT total_points, current_tier FROM nf_core.user_points WHERE user_id = $1
@@ -237,5 +232,91 @@ pub async fn award_points_internal(
 
     tx.commit().await?;
 
+    // Blockchain: Tokenized Gamification
+    let payload_to_anchor = json!({
+        "event": "TOKENIZED_GAMIFICATION_AWARD",
+        "tenant_id": tenant_id.to_string(),
+        "user_id": user_id.to_string(),
+        "points_awarded": points_change,
+        "new_total": new_total,
+        "reason": reason,
+        "timestamp": Utc::now().to_rfc3339()
+    });
+    
+    let hash = crate::services::blockchain::compute_data_hash(&payload_to_anchor);
+    let tx_hash = crate::services::blockchain::anchor_data_on_chain(pool, tenant_id, &hash, &payload_to_anchor).await;
+    println!("[Tokenized Gamification] Minted {} tokens for user {}. Blockchain Tx: {:?}", points_change, user_id, tx_hash);
+
     Ok((new_total, new_tier.to_string()))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RedeemRequest {
+    pub points_amount: i32,
+}
+
+pub async fn redeem_voucher(
+    State(state): State<AppState>,
+    tenant: TenantIsolation,
+    Json(payload): Json<RedeemRequest>,
+) -> Response {
+    if payload.points_amount < 100 {
+        return (StatusCode::BAD_REQUEST, Json(json!({ "error": "Số điểm cần đổi phải tối thiểu là 100." }))).into_response();
+    }
+
+    let user_id = match tenant.user_id {
+        Some(uid) => uid,
+        None => {
+            let user_query = r#"
+                SELECT id FROM nf_core.users WHERE tenant_id = $1 ORDER BY created_at ASC LIMIT 1
+            "#;
+            match sqlx::query_scalar(user_query)
+                .bind(tenant.tenant_id)
+                .fetch_optional(&state.pool)
+                .await
+            {
+                Ok(Some(id)) => id,
+                _ => {
+                    return (StatusCode::BAD_REQUEST, Json(json!({ "error": "Không tìm thấy tài khoản người dùng." }))).into_response();
+                }
+            }
+        }
+    };
+
+    let points_row = sqlx::query(r#"
+        SELECT total_points FROM nf_core.user_points WHERE user_id = $1
+    "#).bind(user_id).fetch_optional(&state.pool).await.unwrap_or(None);
+
+    let total_points = match points_row {
+        Some(row) => row.get::<i32, _>("total_points"),
+        None => 0,
+    };
+
+    if total_points < payload.points_amount {
+        return (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Không đủ điểm đổi thưởng. Số điểm hiện tại: {}", total_points) }))).into_response();
+    }
+
+    let voucher_suffix = Uuid::new_v4().simple().to_string()[..8].to_uppercase();
+    let voucher_code = format!("KVP-50K-{}", voucher_suffix);
+
+    let _ = award_points_internal(
+        &state.pool,
+        tenant.tenant_id,
+        user_id,
+        None,
+        -payload.points_amount,
+        &format!("Đổi thưởng Voucher KiotViet {}", voucher_code)
+    ).await;
+
+    let response = json!({
+        "status": "success",
+        "message": format!("Đã đổi thành công {} điểm lấy Voucher KiotViet!", payload.points_amount),
+        "data": {
+            "voucher_code": voucher_code,
+            "points_redeemed": payload.points_amount,
+            "remaining_points": total_points - payload.points_amount
+        }
+    });
+
+    (StatusCode::OK, Json(response)).into_response()
 }

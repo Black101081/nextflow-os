@@ -153,6 +153,37 @@ pub async fn kiotviet_webhook(
             if let Ok(row) = row_res {
                 let _record_id: Uuid = row.get("id");
                 
+                // Auto-Assignment Logic: Giao việc cho nhân viên SME_OPS
+                let assignee_query = r#"
+                    SELECT id FROM nf_core.users 
+                    WHERE tenant_id = $1 AND role = 'SME_OPS' AND is_active = true
+                    ORDER BY random() LIMIT 1
+                "#;
+                let assignee_id: Option<Uuid> = sqlx::query_scalar(assignee_query)
+                    .bind(tenant_id)
+                    .fetch_optional(&state.pool)
+                    .await
+                    .unwrap_or(None);
+                
+                let w_status = if assignee_id.is_some() { "ASSIGNED" } else { "UNASSIGNED" };
+
+                let insert_work_item = r#"
+                    INSERT INTO nf_core.work_items (
+                        tenant_id, title, description, priority, category, source, external_id, status, assignee_id, metadata
+                    ) VALUES ($1, $2, $3, $4, 'KIOTVIET_ORDER', 'KIOTVIET_CONNECTOR', $5, $6, $7, $8)
+                "#;
+                let _ = sqlx::query(insert_work_item)
+                    .bind(tenant_id)
+                    .bind(format!("Xử lý đơn KiotViet: {}", payload.code))
+                    .bind(format!("Đơn hàng từ KiotViet, tổng giá trị: {}", payload.total))
+                    .bind(priority)
+                    .bind(&payload.code)
+                    .bind(w_status)
+                    .bind(assignee_id)
+                    .bind(&record_data)
+                    .execute(&state.pool)
+                    .await;
+
                 // 5. Trigger Workflow Internal & Webhooks
                 let event_name = "entity.kiotviet_order.created".to_string();
                 let pool_clone = state.pool.clone();

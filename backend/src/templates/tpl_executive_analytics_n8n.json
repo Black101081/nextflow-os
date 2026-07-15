@@ -1,0 +1,200 @@
+{
+  "name": "Cronjob - KiotViet/Zalo Data ETL & Executive Analytics",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger (Midnight)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "id": "node-trigger-midnight"
+    },
+    {
+      "parameters": {
+        "url": "https://api.kiotviet.vn/invoices/today",
+        "method": "GET",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "name": "Fetch KiotViet Sales",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        450,
+        200
+      ],
+      "id": "node-fetch-kiotviet"
+    },
+    {
+      "parameters": {
+        "url": "https://openapi.zalo.me/v2.0/oa/message/stats",
+        "method": "GET"
+      },
+      "name": "Fetch Zalo CS Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        450,
+        400
+      ],
+      "id": "node-fetch-zalo"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "multiplex"
+      },
+      "name": "Merge Data Streams",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ],
+      "id": "node-merge-streams"
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "total_sales",
+              "value": "={{ $json.kiotviet_data.total }}"
+            },
+            {
+              "name": "total_support_tickets",
+              "value": "={{ $json.zalo_data.tickets }}"
+            }
+          ]
+        }
+      },
+      "name": "Data Transform (ETL)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ],
+      "id": "node-transform-etl"
+    },
+    {
+      "parameters": {
+        "prompt": "Analyze this daily report data and generate executive insights for the CEO",
+        "model": "gpt-4"
+      },
+      "name": "AI Insight Generator",
+      "type": "nextflow.aiPredict",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        300
+      ],
+      "id": "node-ai-insight"
+    },
+    {
+      "parameters": {
+        "action": "anchor_data",
+        "blockchain": "U2U L1"
+      },
+      "name": "Blockchain Audit Anchor",
+      "type": "nextflow.blockchainAnchor",
+      "typeVersion": 1,
+      "position": [
+        1300,
+        300
+      ],
+      "id": "node-blockchain-anchor"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (Midnight)": {
+      "main": [
+        [
+          {
+            "node": "Fetch KiotViet Sales",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Zalo CS Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch KiotViet Sales": {
+      "main": [
+        [
+          {
+            "node": "Merge Data Streams",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Zalo CS Stats": {
+      "main": [
+        [
+          {
+            "node": "Merge Data Streams",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Data Streams": {
+      "main": [
+        [
+          {
+            "node": "Data Transform (ETL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Transform (ETL)": {
+      "main": [
+        [
+          {
+            "node": "AI Insight Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Insight Generator": {
+      "main": [
+        [
+          {
+            "node": "Blockchain Audit Anchor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "timezone": "Asia/Ho_Chi_Minh"
+  }
+}

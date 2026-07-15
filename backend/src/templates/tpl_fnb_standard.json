@@ -1,0 +1,123 @@
+{
+    "id": "tpl_fnb_standard",
+    "name": "F&B Standard Pack",
+    "description": "Bộ quy trình chuẩn cho Chuỗi nhà hàng, Cửa hàng đồ uống (F&B). Bao gồm: Kiểm định vệ sinh (QA/QC), Xử lý nguyên liệu tồn, và Dịch vụ khách hàng.",
+    "category": "fnb",
+    "policies": [
+        {
+            "name": "SLA - Vệ sinh mở ca",
+            "description": "Việc kiểm tra vệ sinh phải được hoàn tất trước 09:00 sáng mỗi ngày",
+            "target_type": "time_based",
+            "target_value": "09:00",
+            "action": "escalate_to_leader"
+        }
+    ],
+    "queues": [
+        {
+            "name": "Kiểm định vệ sinh an toàn (QA/QC)",
+            "description": "Kiểm tra định kỳ vệ sinh không gian quán và bếp",
+            "priority": 1,
+            "color": "green",
+            "icon": "ShieldCheck"
+        },
+        {
+            "name": "Xử lý nguyên liệu cận date",
+            "description": "Rà soát và xử lý nguyên liệu sắp hết hạn",
+            "priority": 2,
+            "color": "orange",
+            "icon": "AlertTriangle"
+        }
+    ],
+    "sops": [
+        {
+            "title": "SOP Vệ sinh An toàn Thực phẩm F&B",
+            "content": "## 1. Khu vực Bếp\n- Bàn bếp phải được lau bằng dung dịch sát khuẩn sau mỗi ca.\n- Dao thớt phân biệt rõ ràng: màu đỏ cho thịt sống, màu xanh cho rau củ.\n## 2. Khu vực Phục vụ\n- Sàn nhà phải luôn khô ráo, lau ngay khi có nước đổ.\n- Tủ kính trưng bày lau bằng nước lau kính trước khi mở cửa."
+        },
+        {
+            "title": "Quy trình Hủy Nguyên liệu cận date",
+            "content": "## Quy định Hủy\n- Nguyên liệu trước 1 ngày hết hạn cần phải được dán nhãn đỏ.\n- Quản lý ca trực tiếp kiểm đếm số lượng, chụp hình và cập nhật vào form.\n- Phải có 2 chữ ký xác nhận (Người hủy và Quản lý ca) trước khi đổ bỏ."
+        }
+    ],
+    "connectors": [],
+    "entities": [
+        {
+            "name": "Bàn ăn",
+            "system_name": "fnb_table",
+            "description": "Quản lý trạng thái bàn ăn",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "tableNumber": { "type": "string" },
+                    "status": {
+                        "type": "string",
+                        "enum": ["Available", "Occupied", "Cleaning"]
+                    }
+                }
+            }
+        },
+        {
+            "name": "Biên bản Hủy nguyên liệu",
+            "system_name": "fnb_waste_log",
+            "description": "Ghi nhận nguyên liệu cận date bị hủy",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "ingredient": { "type": "string" },
+                    "quantity": { "type": "number" },
+                    "reason": { "type": "string" },
+                    "managerSignature": { "type": "string" }
+                }
+            }
+        }
+    ],
+    "workflows": [
+        {
+            "name": "Waste Log Approval Escalation",
+            "trigger_event": "entity.fnb_waste_log.created",
+            "dag": {
+                "workflow_id": "00000000-0000-0000-0000-000000000002",
+                "nodes": [
+                    {
+                        "id": "trigger",
+                        "name": "Khi tạo biên bản hủy",
+                        "type": "Trigger",
+                        "event_name": "entity.fnb_waste_log.created"
+                    },
+                    {
+                        "id": "ai_review",
+                        "name": "AI duyệt lý do hủy nguyên liệu",
+                        "type": "AiPredict",
+                        "model": "gemini-1.5-flash",
+                        "prompt_template": "Kiểm tra xem lý do hủy nguyên liệu '{{payload.reason}}' với số lượng {{payload.quantity}} có hợp lệ không."
+                    },
+                    {
+                        "id": "blockchain_anchor",
+                        "name": "Ghi sổ hủy nguyên liệu lên Blockchain",
+                        "type": "BlockchainAnchor",
+                        "data_payload": {
+                            "ingredient": "{{payload.ingredient}}",
+                            "quantity": "{{payload.quantity}}",
+                            "approved": true
+                        }
+                    },
+                    {
+                        "id": "zalo_send",
+                        "name": "Gửi tin báo cho Quản lý",
+                        "type": "ZaloZNSNode",
+                        "phone_number": "{{payload.manager_phone}}",
+                        "template_id": "fnb_waste_alert",
+                        "template_data": {
+                            "ingredient": "{{payload.ingredient}}",
+                            "quantity": "{{payload.quantity}}"
+                        }
+                    }
+                ],
+                "edges": [
+                    { "source_id": "trigger", "target_id": "ai_review" },
+                    { "source_id": "ai_review", "target_id": "blockchain_anchor" },
+                    { "source_id": "blockchain_anchor", "target_id": "zalo_send" }
+                ]
+            }
+        }
+    ]
+}

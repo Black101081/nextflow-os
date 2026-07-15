@@ -1,0 +1,123 @@
+{
+    "id": "tpl_spa_clinic",
+    "name": "Spa & Clinic Pro",
+    "description": "Quản lý giường bệnh, Liệu trình trị liệu, Đặt lịch hẹn và CSKH sau dịch vụ cho chuỗi Spa & Thẩm mỹ viện.",
+    "category": "spa_clinic",
+    "policies": [
+        {
+            "name": "SLA - Chờ khách",
+            "description": "Khách hàng đến cơ sở không được để chờ quá 15 phút mà không có kỹ thuật viên ra tiếp nhận.",
+            "target_type": "completion",
+            "target_value": "900",
+            "action": "notify_manager"
+        }
+    ],
+    "queues": [
+        {
+            "name": "Lễ tân & Đón khách",
+            "description": "Tiếp nhận, tư vấn gói liệu trình",
+            "priority": 2,
+            "color": "pink",
+            "icon": "Heart"
+        },
+        {
+            "name": "Trị liệu & Chăm sóc",
+            "description": "Thực hiện dịch vụ Spa",
+            "priority": 1,
+            "color": "purple",
+            "icon": "Activity"
+        }
+    ],
+    "sops": [
+        {
+            "title": "SOP Đón khách & Tư vấn",
+            "content": "## Quy trình Đón tiếp\n- 1. Chào đón khách bằng tên thật nếu là khách hàng cũ.\n- 2. Mời khách dùng trà detox trong lúc chờ.\n- 3. Check form đánh giá da/cơ địa dị ứng trước khi tư vấn liệu trình.\n- 4. Cập nhật trạng thái 'Đang phục vụ' lên hệ thống."
+        }
+    ],
+    "connectors": [
+        {
+            "name": "zalo_oa",
+            "settings": {
+                "enable_zns": true
+            }
+        }
+    ],
+    "entities": [
+        {
+            "name": "Hồ sơ trị liệu (Therapy Record)",
+            "system_name": "therapy_record",
+            "description": "Lưu trữ lịch sử điều trị và phác đồ liệu trình",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "customerName": {
+                        "type": "string"
+                    },
+                    "therapyType": {
+                        "type": "string",
+                        "enum": [
+                            "Chăm sóc da",
+                            "Giảm mỡ",
+                            "Triệt lông",
+                            "Trị mụn"
+                        ]
+                    },
+                    "sessionNumber": {
+                        "type": "number"
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "healthAllergies": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    ],
+    "workflows": [
+        {
+            "name": "ZNS Nhắc lịch Liệu trình",
+            "trigger_event": "entity.therapy_record.created",
+            "dag": {
+                "workflow_id": "00000000-0000-0000-0000-spa000000001",
+                "nodes": [
+                    {
+                        "id": "trigger",
+                        "name": "Kích hoạt nhắc lịch",
+                        "type": "Trigger",
+                        "event_name": "entity.therapy_record.created"
+                    },
+                    {
+                        "id": "ai_upsell",
+                        "name": "AI Gợi ý Sản phẩm dưỡng da",
+                        "type": "AiPredict",
+                        "model": "gemini-1.5-flash",
+                        "prompt_template": "Dựa trên liệu trình '{{payload.therapyType}}', gợi ý ngắn gọn mỹ phẩm kèm theo."
+                    },
+                    {
+                        "id": "zalo_remind",
+                        "name": "Gửi ZNS Nhắc nhở",
+                        "type": "ZaloZNSNode",
+                        "phone_number": "{{payload.customerPhone}}",
+                        "template_id": "spa_appointment_reminder",
+                        "template_data": {
+                            "customer_name": "{{payload.customerName}}",
+                            "therapy": "{{payload.therapyType}}"
+                        }
+                    }
+                ],
+                "edges": [
+                    {
+                        "source_id": "trigger",
+                        "target_id": "ai_upsell"
+                    },
+                    {
+                        "source_id": "ai_upsell",
+                        "target_id": "zalo_remind"
+                    }
+                ]
+            }
+        }
+    ]
+}

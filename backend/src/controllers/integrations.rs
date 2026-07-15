@@ -87,27 +87,32 @@ pub async fn get_tenant_integrations(
     State(state): State<AppState>,
     tenant: TenantIsolation,
 ) -> Result<impl IntoResponse, Response> {
-    let rows = sqlx::query!(
+    let rows = sqlx::query(
         r#"
         SELECT connector_name, status, created_at, updated_at
         FROM nf_core.connector_configurations
         WHERE tenant_id = $1
-        "#,
-        tenant.tenant_id
+        "#
     )
+    .bind(tenant.tenant_id)
     .fetch_all(&state.pool)
     .await
-    .map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))).into_response()
+    .map_err(|e: sqlx::Error| {
+        (StatusCode::INTERNAL_SERVER_ERROR, axum::Json::<serde_json::Value>(json!({ "error": e.to_string() }))).into_response()
     })?;
 
     let mut installed = vec![];
     for row in rows {
+        use sqlx::Row;
+        let connector_name: String = row.try_get("connector_name").unwrap_or_default();
+        let status: String = row.try_get("status").unwrap_or_default();
+        let created_at: chrono::DateTime<chrono::Utc> = row.try_get("created_at").unwrap_or_else(|_| chrono::Utc::now());
+        let updated_at: chrono::DateTime<chrono::Utc> = row.try_get("updated_at").unwrap_or_else(|_| chrono::Utc::now());
         installed.push(json!({
-            "connector_name": row.connector_name,
-            "status": row.status,
-            "created_at": row.created_at,
-            "updated_at": row.updated_at
+            "connector_name": connector_name,
+            "status": status,
+            "created_at": created_at,
+            "updated_at": updated_at
         }));
     }
 
@@ -117,9 +122,9 @@ pub async fn get_tenant_integrations(
     })))
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct InstallIntegrationPayload {
-    pub credentials: Value,
+    pub credentials: serde_json::Value,
 }
 
 // POST /api/v1/tenants/integrations/:connector_name
@@ -142,26 +147,31 @@ pub async fn install_tenant_integration(
     let credentials_str = serde_json::to_string(&payload.credentials).unwrap_or_default();
     let simulated_encrypted = format!("ENCRYPTED_{}", base64::encode(&credentials_str));
 
-    let result = sqlx::query!(
+    let row = sqlx::query(
         r#"
         INSERT INTO nf_core.connector_configurations (tenant_id, connector_name, status, encrypted_credentials)
         VALUES ($1, $2, 'ACTIVE', $3)
         ON CONFLICT (tenant_id, connector_name) 
         DO UPDATE SET encrypted_credentials = EXCLUDED.encrypted_credentials, status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
         RETURNING id
-        "#,
-        tenant.tenant_id,
-        connector_name,
-        simulated_encrypted
+        "#
     )
+    .bind(tenant.tenant_id)
+    .bind(&connector_name)
+    .bind(simulated_encrypted)
     .fetch_one(&state.pool)
     .await
-    .map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))).into_response()
+    .map_err(|e: sqlx::Error| {
+        (StatusCode::INTERNAL_SERVER_ERROR, axum::Json::<serde_json::Value>(json!({ "error": e.to_string() }))).into_response()
+    })?;
+
+    use sqlx::Row;
+    let connector_id: uuid::Uuid = row.try_get("id").map_err(|e: sqlx::Error| {
+        (StatusCode::INTERNAL_SERVER_ERROR, axum::Json::<serde_json::Value>(json!({ "error": e.to_string() }))).into_response()
     })?;
 
     Ok(Json(json!({
         "message": format!("Cài đặt {} thành công", connector_name),
-        "connector_id": result.id
+        "connector_id": connector_id
     })))
 }

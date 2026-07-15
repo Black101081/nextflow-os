@@ -1,9 +1,9 @@
 # Nextflow OS – Master Index and Reading Map
 
 **Document ID:** 001_OS_MASTER_INDEX_AND_READING_MAP  
-**Scope:** Cross-pack navigation layer for Packs 02–09 and future extensions  
-**Version:** 1.0  
-**Status:** Draft v1  
+**Scope:** Cross-pack navigation layer for Packs 02–10 and future extensions  
+**Version:** 2.0  
+**Status:** ACTIVE — Updated 2026-07-15  
 **Primary Owner:** Product Leadership / Documentation Ops  
 
 ## 1. Mục tiêu tài liệu
@@ -180,16 +180,35 @@ Nếu cần đọc nhanh toàn hệ, 10 tài liệu nên ưu tiên là:
 9. 141 Pack 09 extension and app model  
 10. 147 Pack 09 summary and usage guide
 
+### Pack 10 — Vertical Industry Packs (NEW — Phase 3)
+
+Trả lời:
+- 12 cụm ngành SME được verticalize như thế nào trên Shared Core;
+- Queues, Entities, Workflows và SLAs đặc thù từng ngành;
+- Database schema và API spec cho từng pack;
+- Lộ trình Phase 3 và Phase 4 Platform Maturity.
+
+**Anchor docs mới (2026-07-15):**
+- **200_VERTICAL_PACKS_FEATURE_ANALYSIS**: Phân tích tính năng và đặc tả kỹ thuật cho tất cả 12 packs.
+- **201_PHASE3_VERTICAL_PACK_IMPLEMENTATION_PLAN**: Kế hoạch triển khai Phase 3 với chi tiết kỹ thuật.
+- **202_PHASE3_DATABASE_SCHEMA_ALL_PACKS**: Full SQL DDL schema cho tất cả 12 packs với RLS.
+- **203_PHASE4_STRATEGIC_PLATFORM_MATURITY_PLAN**: Kế hoạch chiến lược Phase 4 (AI, Ecosystem, Analytics).
+
+**Nên đọc khi:** triển khai vertical pack mới, thiết kế industry-specific workflows, xây AI agents cho từng ngành.
+
 ## 7. Tài liệu bổ trợ cross-pack
 
 Các tài liệu cross-pack nên tồn tại bên cạnh các pack chính:
 - **002_OS_PRODUCTION_RULES_AND_DEVELOPMENT_LOG**: Quy tắc sản xuất phần mềm bất biến và Nhật ký phát triển thực tế.
 - **003_OS_PRODUCTION_PHASE_1_IMPLEMENTATION_PLAN**: Kế hoạch sản xuất chi tiết cho Lát cắt năng lực 1.
-- Global Glossary and Naming Conventions  - SME End-User Operational Playbook (150)
-- 
-- Master Index and Reading Map  
-- AI Use Case Record Template  
-- Asset Listing and Review Checklist  
+- **200_VERTICAL_PACKS_FEATURE_ANALYSIS**: Đặc tả tính năng 12 Vertical Industry Packs.
+- **201_PHASE3_VERTICAL_PACK_IMPLEMENTATION_PLAN**: Kế hoạch Phase 3.
+- **202_PHASE3_DATABASE_SCHEMA_ALL_PACKS**: Database schema cho tất cả packs.
+- **203_PHASE4_STRATEGIC_PLATFORM_MATURITY_PLAN**: Kế hoạch Phase 4 chiến lược.
+- Global Glossary and Naming Conventions
+- SME End-User Operational Playbook (150)
+- AI Use Case Record Template
+- Asset Listing and Review Checklist
 - Prompt libraries cho analytics, intelligence và ecosystem
 
 ## 8. Điều kiện hoàn thành của tài liệu

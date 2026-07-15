@@ -82,7 +82,7 @@ pub async fn create_invoice(
 
     // 2.1 Sinh mã Blockchain Trust Layer
     let data_hash = compute_invoice_data_hash(invoice_id, payload.amount, "VND", "UNPAID");
-    let tx_hash = anchor_data_on_chain(&data_hash).await;
+    let tx_hash = anchor_data_on_chain(&state.pool, tenant.tenant_id, &data_hash, &json!({"data": data_hash})).await;
 
     // 3. Insert vào DB
     let result = sqlx::query(
@@ -148,7 +148,7 @@ pub async fn get_invoices(
     // 2. Query từ CSDL
     let records = sqlx::query(
         r#"
-        SELECT id, work_item_id, amount::FLOAT as amount, currency, status, vietqr_string as payment_link_url, due_date, created_at, data_hash, tx_hash
+        SELECT id, work_item_id, amount::float8 as amount, currency, status, vietqr_string as payment_link_url, due_date, created_at, data_hash, tx_hash
         FROM nf_core.invoices
         WHERE tenant_id = $1
         ORDER BY created_at DESC
@@ -162,22 +162,34 @@ pub async fn get_invoices(
         Ok(rows) => {
             let mut invoices = Vec::new();
             for r in rows {
+                let id: Uuid = r.try_get("id").unwrap_or_default();
+                let work_item_id: Uuid = r.try_get("work_item_id").unwrap_or_default();
+                let amount: f64 = r.try_get("amount").unwrap_or_default();
+                let currency: String = r.try_get("currency").unwrap_or_else(|_| "VND".to_string());
+                let status: String = r.try_get("status").unwrap_or_else(|_| "UNPAID".to_string());
+                let payment_link_url: Option<String> = r.try_get("payment_link_url").ok();
+                let due_date: Option<chrono::DateTime<chrono::Utc>> = r.try_get("due_date").ok();
+                let created_at: chrono::DateTime<chrono::Utc> = r.try_get("created_at").unwrap_or_else(|_| chrono::Utc::now());
+                let data_hash: Option<String> = r.try_get("data_hash").ok();
+                let tx_hash: Option<String> = r.try_get("tx_hash").ok();
+
                 invoices.push(json!({
-                    "id": r.get::<Uuid, _>("id"),
-                    "work_item_id": r.get::<Uuid, _>("work_item_id"),
-                    "amount": r.get::<f64, _>("amount"),
-                    "currency": r.get::<String, _>("currency"),
-                    "status": r.get::<String, _>("status"),
-                    "payment_link_url": r.get::<Option<String>, _>("payment_link_url"),
-                    "due_date": r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("due_date"),
-                    "created_at": r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at").unwrap_or_default(),
-                    "data_hash": r.get::<Option<String>, _>("data_hash"),
-                    "tx_hash": r.get::<Option<String>, _>("tx_hash"),
+                    "id": id,
+                    "work_item_id": work_item_id,
+                    "amount": amount,
+                    "currency": currency,
+                    "status": status,
+                    "payment_link_url": payment_link_url,
+                    "due_date": due_date,
+                    "created_at": created_at,
+                    "data_hash": data_hash,
+                    "tx_hash": tx_hash,
                 }));
             }
             Json(json!({ "invoices": invoices })).into_response()
         }
         Err(e) => {
+            eprintln!("[Billing Error] Failed to fetch invoices from db: {:?}", e);
             let err = json!({
                 "error": {
                     "code": "DB_ERROR",
@@ -197,7 +209,7 @@ pub async fn vietqr_webhook(
 ) -> impl IntoResponse {
     
     // Tìm hóa đơn dựa trên nội dung chuyển khoản (transfer_content)
-    let inv_row = sqlx::query("SELECT id, amount::FLOAT FROM nf_core.invoices WHERE transfer_content = $1 AND status = 'UNPAID'")
+    let inv_row = sqlx::query("SELECT id, tenant_id, amount::FLOAT FROM nf_core.invoices WHERE transfer_content = $1 AND status = 'UNPAID'")
         .bind(&payload.transfer_content)
         .fetch_optional(&state.pool)
         .await;
@@ -205,11 +217,12 @@ pub async fn vietqr_webhook(
     if let Ok(Some(row)) = inv_row {
         let invoice_id: Uuid = row.get("id");
         let expected_amount: f64 = row.get("amount");
+        let tenant_id: Uuid = row.get("tenant_id");
 
         if payload.amount >= expected_amount {
             // 1. Sinh mã băm Blockchain mới cho trạng thái PAID
             let new_data_hash = compute_invoice_data_hash(invoice_id, payload.amount, "VND", "PAID");
-            let new_tx_hash = anchor_data_on_chain(&new_data_hash).await;
+            let new_tx_hash = anchor_data_on_chain(&state.pool, tenant_id, &new_data_hash, &json!({"data": new_data_hash})).await;
 
             // 2. Cập nhật Invoices -> PAID và lưu trữ mã Hash mới
             let inv_result = sqlx::query(

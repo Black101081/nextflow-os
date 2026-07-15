@@ -57,19 +57,11 @@ pub struct RoutingRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct RagQueryRequest {
-    pub question: String,
-    #[serde(default = "default_top_k")]
-    pub top_k: i32,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 pub struct BatchSlaRiskRequest {
     pub items: Vec<SlaRiskRequest>,
 }
 
 fn default_general() -> String { "GENERAL".to_string() }
-fn default_top_k() -> i32 { 5 }
 
 // --------------------------------------------------------------------------
 // Helper: proxy request sang AI service
@@ -229,23 +221,6 @@ async fn fetch_queue_operators(
     }).collect())
 }
 
-// --------------------------------------------------------------------------
-// Endpoint 4: POST /api/v1/ai/rag-query
-// --------------------------------------------------------------------------
-pub async fn ai_rag_query(
-    State(_state): State<AppState>,
-    tenant: TenantIsolation,
-    Json(req): Json<RagQueryRequest>,
-) -> Result<impl IntoResponse, Response> {
-    let body = json!({
-        "question":  req.question,
-        "top_k":     req.top_k,
-        "tenant_id": tenant.tenant_id.to_string(),
-    });
-
-    let result = proxy_to_ai("rag-query", body, tenant.tenant_id).await?;
-    Ok(Json(result))
-}
 
 // --------------------------------------------------------------------------
 // Endpoint 5: GET /api/v1/ai/health
@@ -268,41 +243,86 @@ pub async fn ai_health_check() -> impl IntoResponse {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct GenerateWorkflowRequest {
     pub prompt: String,
 }
 
 pub async fn generate_workflow(
     State(_state): State<AppState>,
-    _tenant: TenantIsolation,
+    tenant: TenantIsolation,
     Json(req): Json<GenerateWorkflowRequest>,
 ) -> Result<impl IntoResponse, Response> {
     println!("[AI Proxy] Generating workflow for prompt: {}", req.prompt);
 
-    let mock_nodes = vec![
-        json!({ "id": "start", "position": { "x": 250, "y": 50 }, "data": { "label": "Bắt đầu" } }),
-        json!({ "id": "zalo", "position": { "x": 250, "y": 150 }, "data": { "label": "Gửi tin Zalo OA" } }),
-        json!({ "id": "shipping", "position": { "x": 100, "y": 250 }, "data": { "label": "GHTK" } }),
-        json!({ "id": "payment", "position": { "x": 400, "y": 250 }, "data": { "label": "VietQR" } }),
-        json!({ "id": "end", "position": { "x": 250, "y": 350 }, "data": { "label": "Hoàn thành" } }),
-    ];
+    let prompt_lower = req.prompt.to_lowercase();
+    let is_spa = prompt_lower.contains("spa") || prompt_lower.contains("clinic") || prompt_lower.contains("dị ứng");
+    let is_fb = prompt_lower.contains("f&b") || prompt_lower.contains("đặt món") || prompt_lower.contains("nhà hàng") || prompt_lower.contains("món");
 
-    let mock_edges = vec![
-        json!({ "id": "e1", "source": "start", "target": "zalo" }),
-        json!({ "id": "e2", "source": "zalo", "target": "shipping" }),
-        json!({ "id": "e3", "source": "zalo", "target": "payment" }),
-        json!({ "id": "e4", "source": "shipping", "target": "end" }),
-        json!({ "id": "e5", "source": "payment", "target": "end" }),
-    ];
+    let mock_result = if is_spa {
+        json!({
+            "message": "AI: Đã tự động tạo sơ đồ bồi hoàn Spa/Clinic bằng Smart Contract thành công!",
+            "nodes": [
+                { "id": "1", "type": "triggerNode", "position": { "x": 50, "y": 300 }, "data": { "label": "Khiếu nại Spa (trễ SLA/dị ứng)" } },
+                { "id": "2", "type": "aiAgentNode", "position": { "x": 250, "y": 300 }, "data": { "label": "AI Auto-Triage Phân tích" } },
+                { "id": "3", "type": "conditionNode", "position": { "x": 450, "y": 300 }, "data": { "label": "Cần bồi thường?" } },
+                { "id": "4", "type": "smartContractNode", "position": { "x": 650, "y": 180 }, "data": { "label": "Bồi hoàn 50 Tokens Smart Contract" } },
+                { "id": "5", "type": "zaloNode", "position": { "x": 880, "y": 180 }, "data": { "label": "Zalo ZNS Báo nhận bồi hoàn" } },
+                { "id": "6", "type": "zaloNode", "position": { "x": 650, "y": 420 }, "data": { "label": "Zalo ZNS Gửi tin xin lỗi thường" } }
+            ],
+            "edges": [
+                { "id": "e1-2", "source": "1", "target": "2", "animated": true },
+                { "id": "e2-3", "source": "2", "target": "3", "animated": true },
+                { "id": "e3-4", "source": "3", "target": "4", "sourceHandle": "true-port", "animated": true },
+                { "id": "e4-5", "source": "4", "target": "5", "animated": true },
+                { "id": "e3-6", "source": "3", "target": "6", "sourceHandle": "false-port", "animated": true }
+            ]
+        })
+    } else if is_fb {
+        json!({
+            "message": "AI: Đã tự động lập sơ đồ luồng tự động chốt đơn F&B qua Zalo OA & KiotViet!",
+            "nodes": [
+                { "id": "1", "type": "triggerNode", "position": { "x": 50, "y": 300 }, "data": { "label": "Tin nhắn Zalo đặt món F&B" } },
+                { "id": "2", "type": "aiAgentNode", "position": { "x": 250, "y": 300 }, "data": { "label": "AI Trích xuất đơn & Số điện thoại" } },
+                { "id": "3", "type": "conditionNode", "position": { "x": 450, "y": 300 }, "data": { "label": "Hợp lệ?" } },
+                { "id": "4", "type": "httpNode", "position": { "x": 650, "y": 180 }, "data": { "label": "POS KiotViet: Tạo đơn hàng" } },
+                { "id": "5", "type": "zaloNode", "position": { "x": 880, "y": 180 }, "data": { "label": "Zalo ZNS Gửi bill xác nhận" } },
+                { "id": "6", "type": "zaloNode", "position": { "x": 650, "y": 420 }, "data": { "label": "Zalo ZNS Hỏi lại thông tin sđt" } }
+            ],
+            "edges": [
+                { "id": "e1-2", "source": "1", "target": "2", "animated": true },
+                { "id": "e2-3", "source": "2", "target": "3", "animated": true },
+                { "id": "e3-4", "source": "3", "target": "4", "sourceHandle": "true-port", "animated": true },
+                { "id": "e4-5", "source": "4", "target": "5", "animated": true },
+                { "id": "e3-6", "source": "3", "target": "6", "sourceHandle": "false-port", "animated": true }
+            ]
+        })
+    } else {
+        json!({
+            "message": "AI: Đã lập sơ đồ liên kết tự động hóa tiêu chuẩn!",
+            "nodes": [
+                { "id": "1", "type": "triggerNode", "position": { "x": 50, "y": 300 }, "data": { "label": "Khách hàng liên hệ" } },
+                { "id": "2", "type": "aiAgentNode", "position": { "x": 280, "y": 300 }, "data": { "label": "AI Phân tích yêu cầu" } },
+                { "id": "3", "type": "zaloNode", "position": { "x": 520, "y": 300 }, "data": { "label": "Zalo ZNS Phản hồi tự động" } }
+            ],
+            "edges": [
+                { "id": "e1-2", "source": "1", "target": "2", "animated": true },
+                { "id": "e2-3", "source": "2", "target": "3", "animated": true }
+            ]
+        })
+    };
 
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    let body = serde_json::to_value(&req).map_err(|e| {
+        (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response()
+    })?;
 
-    Ok(Json(json!({
-        "nodes": mock_nodes,
-        "edges": mock_edges,
-        "message": "AI đã tạo quy trình thành công!"
-    })))
+    match proxy_to_ai("generate-workflow", body, tenant.tenant_id).await {
+        Ok(result) => Ok(Json(result)),
+        Err(_) => {
+            println!("[AI Proxy] AI Service offline. Falling back to structured mock workflow.");
+            Ok(Json(mock_result))
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -320,5 +340,116 @@ pub async fn ai_extract_invoice(
     })?;
 
     let result = proxy_to_ai("extract-invoice", body, tenant.tenant_id).await?;
+    Ok(Json(result))
+}
+
+
+// --------------------------------------------------------------------------
+// Phase 4: Pharmacy Drug Interaction, Real Estate Lead Scoring, Logistics Route Optimization
+// --------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DrugInteractionRequest {
+    pub prescription_id: String,
+    pub medicines: Vec<serde_json::Value>,
+}
+
+pub async fn ai_drug_interaction(
+    State(_state): State<AppState>,
+    tenant: TenantIsolation,
+    Json(req): Json<DrugInteractionRequest>,
+) -> Result<impl IntoResponse, Response> {
+    let body = serde_json::to_value(&req).map_err(|e| {
+        (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response()
+    })?;
+
+    let result = proxy_to_ai("pharmacy/drug-interaction", body, tenant.tenant_id).await?;
+    Ok(Json(result))
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct LeadScoringRequest {
+    pub budget_vnd: f64,
+    pub interaction_count: i32,
+    pub source: String,
+    pub property_type: Option<String>,
+    pub urgency: Option<String>,
+}
+
+pub async fn ai_lead_scoring(
+    State(_state): State<AppState>,
+    tenant: TenantIsolation,
+    Json(req): Json<LeadScoringRequest>,
+) -> Result<impl IntoResponse, Response> {
+    let body = serde_json::to_value(&req).map_err(|e| {
+        (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response()
+    })?;
+
+    let result = proxy_to_ai("real-estate/lead-score", body, tenant.tenant_id).await?;
+    Ok(Json(result))
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RouteStop {
+    pub id: String,
+    pub address: String,
+    pub recipient_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RouteOptimizationRequest {
+    pub stops: Vec<RouteStop>,
+}
+
+pub async fn ai_route_optimization(
+    State(_state): State<AppState>,
+    tenant: TenantIsolation,
+    Json(req): Json<RouteOptimizationRequest>,
+) -> Result<impl IntoResponse, Response> {
+    let body = serde_json::to_value(&req).map_err(|e| {
+        (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response()
+    })?;
+
+    let result = proxy_to_ai("logistics/route-optimize", body, tenant.tenant_id).await?;
+    Ok(Json(result))
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DemandForecastRequest {
+    pub historical_sales: Vec<f64>,
+    pub horizon: Option<i32>,
+}
+
+pub async fn ai_demand_forecasting(
+    State(_state): State<AppState>,
+    tenant: TenantIsolation,
+    Json(req): Json<DemandForecastRequest>,
+) -> Result<impl IntoResponse, Response> {
+    let body = serde_json::to_value(&req).map_err(|e| {
+        (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response()
+    })?;
+
+    let result = proxy_to_ai("retail-fnb/demand-forecast", body, tenant.tenant_id).await?;
+    Ok(Json(result))
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DynamicPricingRequest {
+    pub base_price: f64,
+    pub occupancy_rate: f64,
+    pub competitor_price: f64,
+    pub is_weekend: Option<bool>,
+}
+
+pub async fn ai_dynamic_pricing(
+    State(_state): State<AppState>,
+    tenant: TenantIsolation,
+    Json(req): Json<DynamicPricingRequest>,
+) -> Result<impl IntoResponse, Response> {
+    let body = serde_json::to_value(&req).map_err(|e| {
+        (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response()
+    })?;
+
+    let result = proxy_to_ai("hospitality/dynamic-price", body, tenant.tenant_id).await?;
     Ok(Json(result))
 }

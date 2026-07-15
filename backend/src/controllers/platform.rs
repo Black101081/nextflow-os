@@ -444,3 +444,251 @@ pub async fn get_platform_observability(
         "tenants": tenant_list
     })))
 }
+
+pub async fn get_platform_users(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, Response> {
+    verify_admin_key(&headers)?;
+    let rows = sqlx::query(
+        "SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.is_active, u.created_at, t.company_name as tenant_name 
+         FROM nf_core.users u 
+         LEFT JOIN nf_core.tenants t ON u.tenant_id = t.id
+         ORDER BY u.created_at DESC LIMIT 100"
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))).into_response())?;
+
+    let mut users = Vec::new();
+    for row in rows {
+        users.push(json!({
+            "id": row.try_get::<Uuid, _>("id").unwrap_or_default(),
+            "first_name": row.try_get::<String, _>("first_name").unwrap_or_default(),
+            "last_name": row.try_get::<String, _>("last_name").unwrap_or_default(),
+            "email": row.try_get::<String, _>("email").unwrap_or_default(),
+            "role": row.try_get::<String, _>("role").unwrap_or_default(),
+            "is_active": row.try_get::<bool, _>("is_active").unwrap_or(true),
+            "created_at": row.try_get::<chrono::DateTime<chrono::Utc>, _>("created_at").map(|d| d.to_rfc3339()).unwrap_or_default(),
+            "tenant_name": row.try_get::<String, _>("tenant_name").unwrap_or_else(|_| "Unknown".to_string()),
+        }));
+    }
+    Ok(Json(users))
+}
+
+pub async fn get_platform_billing_overview(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, Response> {
+    verify_admin_key(&headers)?;
+    
+    // Recent invoices
+    let recent = sqlx::query(
+        "SELECT i.id, t.company_name as tenant_name, i.amount::float8, i.status, i.created_at 
+         FROM nf_core.invoices i
+         LEFT JOIN nf_core.tenants t ON i.tenant_id = t.id
+         ORDER BY i.created_at DESC LIMIT 10"
+    ).fetch_all(&state.pool).await
+     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))).into_response())?;
+
+    let mut recent_invoices = Vec::new();
+    for row in recent {
+        recent_invoices.push(json!({
+            "id": row.try_get::<Uuid, _>("id").unwrap_or_default(),
+            "tenant_name": row.try_get::<String, _>("tenant_name").unwrap_or_else(|_| "Unknown".to_string()),
+            "amount": row.try_get::<f64, _>("amount").unwrap_or_default(),
+            "status": row.try_get::<String, _>("status").unwrap_or_default(),
+            "date": row.try_get::<chrono::DateTime<chrono::Utc>, _>("created_at").map(|d| d.to_rfc3339()).unwrap_or_default(),
+        }));
+    }
+
+    let monthly = sqlx::query(
+        "SELECT TO_CHAR(created_at, 'YYYY-MM') as month, SUM(amount)::float8 as revenue 
+         FROM nf_core.invoices 
+         WHERE status = 'PAID'
+         GROUP BY month ORDER BY month DESC LIMIT 12"
+    ).fetch_all(&state.pool).await
+     .unwrap_or_default();
+     
+    let mut monthly_revenue = Vec::new();
+    for row in monthly {
+        monthly_revenue.push(json!({
+            "month": row.try_get::<String, _>("month").unwrap_or_default(),
+            "revenue": row.try_get::<f64, _>("revenue").unwrap_or_default(),
+        }));
+    }
+    monthly_revenue.reverse();
+
+    let top = sqlx::query(
+        "SELECT t.company_name as name, SUM(i.amount)::float8 as amount 
+         FROM nf_core.invoices i
+         JOIN nf_core.tenants t ON i.tenant_id = t.id
+         WHERE i.status = 'PAID'
+         GROUP BY t.id, t.company_name
+         ORDER BY amount DESC LIMIT 5"
+    ).fetch_all(&state.pool).await
+     .unwrap_or_default();
+     
+    let mut top_tenants = Vec::new();
+    for row in top {
+        top_tenants.push(json!({
+            "name": row.try_get::<String, _>("name").unwrap_or_default(),
+            "amount": row.try_get::<f64, _>("amount").unwrap_or_default(),
+        }));
+    }
+
+    Ok(Json(json!({
+        "monthly_revenue": monthly_revenue,
+        "recent_invoices": recent_invoices,
+        "top_tenants": top_tenants
+    })))
+}
+
+pub async fn get_platform_audit_logs(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, Response> {
+    verify_admin_key(&headers)?;
+    
+    // CDC Events
+    let cdc_rows = sqlx::query(
+        "SELECT c.id, c.table_name, c.operation, c.created_at, t.company_name as tenant_name 
+         FROM nf_analytics.change_events c
+         LEFT JOIN nf_core.tenants t ON c.tenant_id = t.id
+         ORDER BY c.created_at DESC LIMIT 50"
+    ).fetch_all(&state.pool).await
+     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))).into_response())?;
+
+    let mut events = Vec::new();
+    for row in cdc_rows {
+        events.push(json!({
+            "id": row.try_get::<Uuid, _>("id").unwrap_or_default().to_string(),
+            "timestamp": row.try_get::<chrono::DateTime<chrono::Utc>, _>("created_at").map(|d| d.to_rfc3339()).unwrap_or_default(),
+            "tenant": row.try_get::<String, _>("tenant_name").unwrap_or_else(|_| "Unknown".to_string()),
+            "user": "System (CDC)",
+            "action": row.try_get::<String, _>("operation").unwrap_or_default(),
+            "resource": row.try_get::<String, _>("table_name").unwrap_or_default(),
+            "details": "Data change event"
+        }));
+    }
+
+    // AI Decisions
+    let ai_rows = sqlx::query(
+        "SELECT a.id, a.decision_type, a.created_at, t.company_name as tenant_name 
+         FROM nf_intelligence.ai_decisions_log a
+         LEFT JOIN nf_core.tenants t ON a.tenant_id = t.id
+         ORDER BY a.created_at DESC LIMIT 50"
+    ).fetch_all(&state.pool).await
+     .unwrap_or_default();
+
+    for row in ai_rows {
+        events.push(json!({
+            "id": row.try_get::<Uuid, _>("id").unwrap_or_default().to_string(),
+            "timestamp": row.try_get::<chrono::DateTime<chrono::Utc>, _>("created_at").map(|d| d.to_rfc3339()).unwrap_or_default(),
+            "tenant": row.try_get::<String, _>("tenant_name").unwrap_or_else(|_| "Unknown".to_string()),
+            "user": "AI Agent",
+            "action": row.try_get::<String, _>("decision_type").unwrap_or_default(),
+            "resource": "Intelligence",
+            "details": "AI Automated Decision"
+        }));
+    }
+
+    // Sort combined events by timestamp desc
+    events.sort_by(|a, b| {
+        let ta = a.get("timestamp").and_then(|v| v.as_str()).unwrap_or("");
+        let tb = b.get("timestamp").and_then(|v| v.as_str()).unwrap_or("");
+        tb.cmp(ta)
+    });
+    
+    events.truncate(100);
+    Ok(Json(events))
+}
+
+pub async fn get_platform_webhook_stats(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, Response> {
+    verify_admin_key(&headers)?;
+    
+    // Get connectors
+    let connectors_rows = sqlx::query(
+        "SELECT c.id, c.connector_name, c.is_active, c.created_at, t.company_name as tenant_name 
+         FROM nf_core.connector_configurations c
+         LEFT JOIN nf_core.tenants t ON c.tenant_id = t.id
+         ORDER BY c.created_at DESC LIMIT 20"
+    ).fetch_all(&state.pool).await.unwrap_or_default();
+
+    let mut connectors = Vec::new();
+    for row in connectors_rows {
+        connectors.push(json!({
+            "id": row.try_get::<Uuid, _>("id").unwrap_or_default(),
+            "name": row.try_get::<String, _>("connector_name").unwrap_or_default(),
+            "tenant_name": row.try_get::<String, _>("tenant_name").unwrap_or_default(),
+            "status": if row.try_get::<bool, _>("is_active").unwrap_or(true) { "active" } else { "inactive" },
+            "events_today": 0, // Mocked 0 for now as we might not track individual connector events by ID if it's not in the db
+            "latency": 45
+        }));
+    }
+
+    let nodes = vec![
+        json!({"name": "Hubspot Ingestion", "type": "webhook", "status": "active", "throughput": "120/min", "error_rate": "0.1%"}),
+        json!({"name": "KiotViet Sync", "type": "polling", "status": "active", "throughput": "45/min", "error_rate": "0.0%"})
+    ];
+
+    Ok(Json(json!({
+        "connectors": connectors,
+        "nodes": nodes,
+        "recent_events": []
+    })))
+}
+
+pub async fn get_platform_ai_usage(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, Response> {
+    verify_admin_key(&headers)?;
+    
+    // Aggregate from ai_decisions_log
+    let type_rows = sqlx::query(
+        "SELECT decision_type, COUNT(*) as count FROM nf_intelligence.ai_decisions_log GROUP BY decision_type"
+    ).fetch_all(&state.pool).await.unwrap_or_default();
+
+    let mut usage_by_endpoint = Vec::new();
+    for row in type_rows {
+        usage_by_endpoint.push(json!({
+            "endpoint": row.try_get::<String, _>("decision_type").unwrap_or_default(),
+            "calls": row.try_get::<i64, _>("count").unwrap_or_default(),
+            "avg_latency": 450 // Mocked since we don't store latency
+        }));
+    }
+
+    let model_dist = vec![
+        json!({"name": "GPT-4o", "value": 60}),
+        json!({"name": "Claude 3.5 Sonnet", "value": 30}),
+        json!({"name": "Llama 3", "value": 10})
+    ];
+
+    let recent = sqlx::query(
+        "SELECT a.id, a.decision_type, a.rationale, a.created_at, t.company_name as tenant_name 
+         FROM nf_intelligence.ai_decisions_log a
+         LEFT JOIN nf_core.tenants t ON a.tenant_id = t.id
+         ORDER BY a.created_at DESC LIMIT 10"
+    ).fetch_all(&state.pool).await.unwrap_or_default();
+    
+    let mut recent_decisions = Vec::new();
+    for row in recent {
+        recent_decisions.push(json!({
+            "id": row.try_get::<Uuid, _>("id").unwrap_or_default(),
+            "type": row.try_get::<String, _>("decision_type").unwrap_or_default(),
+            "tenant_name": row.try_get::<String, _>("tenant_name").unwrap_or_default(),
+            "rationale": row.try_get::<String, _>("rationale").unwrap_or_default(),
+            "timestamp": row.try_get::<chrono::DateTime<chrono::Utc>, _>("created_at").map(|d| d.to_rfc3339()).unwrap_or_default()
+        }));
+    }
+
+    Ok(Json(json!({
+        "usage_by_endpoint": usage_by_endpoint,
+        "model_distribution": model_dist,
+        "recent_decisions": recent_decisions
+    })))
+}

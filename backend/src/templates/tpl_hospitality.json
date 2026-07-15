@@ -1,0 +1,79 @@
+{
+    "id": "tpl_hospitality",
+    "name": "Hospitality & PMS",
+    "description": "Quản lý Khách sạn, Homestay: Đặt phòng, Dịch vụ phòng, Check-in/out, Đánh giá chất lượng.",
+    "category": "hospitality",
+    "policies": [
+        {
+            "name": "SLA - Dọn phòng",
+            "description": "Dọn phòng (Housekeeping) phải hoàn thành trong 45 phút kể từ khi khách check-out.",
+            "target_type": "completion",
+            "target_value": "2700",
+            "action": "escalate"
+        }
+    ],
+    "queues": [
+        {
+            "name": "Housekeeping",
+            "description": "Buồng phòng",
+            "priority": 1,
+            "color": "teal",
+            "icon": "Home"
+        }
+    ],
+    "sops": [
+        {
+            "title": "SOP Check-in Khách sạn",
+            "content": "1. Mượn CMND/Passport khách hàng.\n2. Xác nhận Booking trên hệ thống.\n3. Thu tiền cọc (Deposit).\n4. Bàn giao chìa khóa/Thẻ từ."
+        }
+    ],
+    "connectors": [],
+    "entities": [
+        {
+            "name": "Đặt phòng (Booking)",
+            "system_name": "hotel_booking",
+            "description": "Quản lý thông tin đặt phòng",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "guestName": {
+                        "type": "string"
+                    },
+                    "roomType": {
+                        "type": "string"
+                    },
+                    "checkInDate": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "RESERVED",
+                            "CHECKED_IN",
+                            "CHECKED_OUT"
+                        ]
+                    }
+                }
+            }
+        }
+    ],
+    "workflows": [
+        {
+            "name": "Welcome Guest",
+            "trigger_event": "entity.hotel_booking.created",
+            "dag": {
+                "workflow_id": "00000000-0000-0000-0000-hos000000001",
+                "nodes": [
+                    {
+                        "id": "trigger",
+                        "name": "Nhận Booking",
+                        "type": "Trigger",
+                        "event_name": "entity.hotel_booking.created"
+                    }
+                ],
+                "edges": []
+            }
+        }
+    ]
+}

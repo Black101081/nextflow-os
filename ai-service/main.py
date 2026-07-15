@@ -23,6 +23,26 @@ from sla_risk_engine import (
 from routing_recommender import OperatorProfile, RoutingRequest, recommend_operators
 from rag_assistant import query_rag, build_index_if_needed, reindex_tenant
 
+from drug_interaction import PharmacyDrugInteractionAgent
+from real_estate_lead import RealEstateLeadScoringAgent
+from logistics_route import LogisticsRouteOptimizerAgent
+from demand_forecast import DemandForecastingAgent
+from dynamic_pricing import DynamicPricingAgent
+
+from dotenv import load_dotenv
+load_dotenv()
+
+from google import genai
+_gemini_client = None
+if os.environ.get("GEMINI_API_KEY"):
+    _gemini_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+
+_drug_interaction_agent = PharmacyDrugInteractionAgent(_gemini_client)
+_lead_scoring_agent = RealEstateLeadScoringAgent(_gemini_client)
+_route_optimizer_agent = LogisticsRouteOptimizerAgent(_gemini_client)
+_demand_forecasting_agent = DemandForecastingAgent(_gemini_client)
+_dynamic_pricing_agent = DynamicPricingAgent(_gemini_client)
+
 # --------------------------------------------------------------------------
 # Lifespan: khởi tạo models khi server start
 # --------------------------------------------------------------------------
@@ -289,6 +309,233 @@ async def extract_invoice_endpoint(req: ExtractInvoiceRequest):
         "items": items if items else ["Dịch vụ/Mặt hàng tổng hợp"],
         "method": "regex-fallback"
     }
+
+
+class GenerateWorkflowRequest(BaseModel):
+    prompt: str
+
+@app.post("/generate-workflow")
+async def generate_workflow_endpoint(req: GenerateWorkflowRequest):
+    """Sử dụng LLM (Gemini) để sinh workflow (nodes & edges) dựa trên yêu cầu (prompt)."""
+    if not _gemini_client:
+        return {
+            "nodes": [
+                {"id": "1", "type": "triggerNode", "position": {"x": 250, "y": 50}, "data": {"label": "Lỗi API Key"}},
+                {"id": "2", "type": "zaloNode", "position": {"x": 250, "y": 200}, "data": {"label": "Vui lòng cấu hình GEMINI_API_KEY"}}
+            ],
+            "edges": [{"id": "e1-2", "source": "1", "target": "2"}],
+            "message": "GEMINI_API_KEY không tồn tại!"
+        }
+
+    system_prompt = """Bạn là một chuyên gia thiết kế Automation Workflow (luồng tự động hóa).
+Bạn cần nhận diện ý định từ người dùng và trả về một luồng xử lý dạng JSON.
+Các loại node hợp lệ bao gồm:
+- triggerNode: Thường là node xuất phát (ví dụ: Đơn hàng mới, Có thông báo...)
+- conditionNode: Dùng để rẽ nhánh bằng logic IF/ELSE
+- zaloNode: Dành cho hành động gửi tin nhắn Zalo ZNS
+- httpNode: Gửi HTTP Request, Webhook
+- approvalNode: Dành cho quy trình cần có người phê duyệt
+
+Quy tắc xuất JSON:
+1. Phải chứa 2 mảng chính là "nodes" và "edges".
+2. Thuộc tính của một Node:
+   "id": chuỗi duy nhất
+   "type": thuộc 1 trong các loại hợp lệ ở trên
+   "position": đối tượng {"x": int, "y": int}
+   "data": đối tượng chứa thông tin node, BẮT BUỘC có thuộc tính "label" là tên node. Các thuộc tính khác tùy chọn theo node (ví dụ: "phone", "templateId" với zaloNode, "expression" với conditionNode).
+3. Thuộc tính của một Edge:
+   "id": chuỗi duy nhất, thường dạng "e{source}-{target}"
+   "source": id của node nguồn
+   "target": id của node đích
+
+CHỈ trả về JSON hợp lệ, không chứa giải thích hay Markdown tags. 
+Trải dài các node trên trục y để dễ nhìn (VD: x=250, y=50 rồi y=200, y=350)."""
+
+    try:
+        response = _gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[system_prompt, req.prompt],
+        )
+        cleaned_text = response.text.replace("```json", "").replace("```", "").strip()
+        import json
+        parsed = json.loads(cleaned_text)
+        return parsed
+    except Exception as e:
+        print(f"[AI Service] Workflow generation failed: {e}")
+        return {
+            "nodes": [
+                {"id": "start", "type": "triggerNode", "position": {"x": 250, "y": 50}, "data": {"label": "Lỗi AI"}},
+                {"id": "end", "type": "zaloNode", "position": {"x": 250, "y": 200}, "data": {"label": str(e)}}
+            ],
+            "edges": [{"id": "e1", "source": "start", "target": "end"}],
+            "message": f"AI Lỗi: {e}"
+        }
+
+
+class TriageRequest(BaseModel):
+    query: str
+    tenant_id: str
+
+@app.post("/api/v1/ai/triage")
+async def triage_endpoint(req: TriageRequest):
+    """Sử dụng LLM để trả lời tự động tin nhắn của khách hàng (Auto-reply Bot)."""
+    if not _gemini_client:
+        return {"answer": "Hệ thống AI đang bảo trì, vui lòng để lại tin nhắn."}
+
+    system_prompt = """Bạn là trợ lý AI chăm sóc khách hàng.
+Nhiệm vụ của bạn là phân tích tin nhắn của khách hàng và đưa ra câu trả lời phù hợp, lịch sự, ngắn gọn.
+Nếu khách hàng hỏi về đơn hàng, báo họ cung cấp mã đơn hàng.
+Nếu khách hàng hỏi về hỗ trợ kỹ thuật, hướng dẫn họ mô tả chi tiết lỗi.
+Nếu là câu hỏi chung, trả lời một cách tự nhiên."""
+
+    try:
+        response = _gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[system_prompt, req.query],
+        )
+        return {"answer": response.text.strip()}
+    except Exception as e:
+        print(f"[AI Service] Triage failed: {e}")
+        return {"answer": "Hiện tại hệ thống AI đang bận. Yêu cầu của bạn đã được ghi nhận."}
+
+
+class CustomerInfo(BaseModel):
+    customer_id: str
+    monetary: float
+    frequency: int
+    recency: int
+
+class SegmentCustomersRequest(BaseModel):
+    tenant_id: str
+    customers: list[CustomerInfo]
+
+@app.post("/api/v1/ai/segment-customers")
+async def segment_customers_endpoint(req: SegmentCustomersRequest):
+    """Sử dụng LLM để phân nhóm khách hàng theo RFM."""
+    if not req.customers:
+        return {"segments": []}
+    
+    if not _gemini_client:
+        # Fallback algorithm
+        segments = []
+        for c in req.customers:
+            if c.monetary > 10000000 and c.frequency > 5:
+                seg = "VIP"
+                health = 95
+            elif c.recency > 90:
+                seg = "CHURNING"
+                health = 25
+            elif c.frequency > 1:
+                seg = "REGULAR"
+                health = 75
+            else:
+                seg = "NEW"
+                health = 85
+            segments.append({"customer_id": c.customer_id, "segment": seg, "ai_health_score": health})
+        return {"segments": segments}
+
+    system_prompt = """Bạn là AI chuyên gia phân tích dữ liệu RFM (Recency, Frequency, Monetary).
+Nhiệm vụ của bạn là phân khúc danh sách khách hàng sau vào 4 nhóm: VIP, REGULAR, NEW, CHURNING và đưa ra chỉ số sức khỏe của khách hàng (ai_health_score từ 0 đến 100) đại diện cho độ gắn kết hoặc khả năng rời bỏ (VIP: 90-100, REGULAR: 60-89, NEW: 70-85, CHURNING: 0-59).
+Định dạng output là JSON mảng các object {"customer_id": "...", "segment": "...", "ai_health_score": <number>}.
+Không xuất ra bất kỳ text nào ngoài JSON hợp lệ."""
+
+    customers_json = [{"id": c.customer_id, "R": c.recency, "F": c.frequency, "M": c.monetary} for c in req.customers]
+
+    try:
+        response = _gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[system_prompt, str(customers_json)],
+        )
+        cleaned = response.text.replace("```json", "").replace("```", "").strip()
+        import json
+        parsed = json.loads(cleaned)
+        for item in parsed:
+            if "ai_health_score" not in item:
+                seg = item.get("segment", "REGULAR")
+                item["ai_health_score"] = 95 if seg == "VIP" else (25 if seg == "CHURNING" else 75)
+        return {"segments": parsed}
+    except Exception as e:
+        print(f"[AI Service] Segmentation failed: {e}")
+        # Fallback list with health score
+        segments = []
+        for c in req.customers:
+            if c.monetary > 10000000 and c.frequency > 5:
+                seg = "VIP"
+                health = 95
+            elif c.recency > 90:
+                seg = "CHURNING"
+                health = 25
+            elif c.frequency > 1:
+                seg = "REGULAR"
+                health = 75
+            else:
+                seg = "NEW"
+                health = 85
+            segments.append({"customer_id": c.customer_id, "segment": seg, "ai_health_score": health})
+        return {"segments": segments}
+
+
+
+# --------------------------------------------------------------------------
+# Phase 4 endpoints: Pharmacy, Real Estate, Logistics AI Agents
+# --------------------------------------------------------------------------
+class DrugInteractionRequest(BaseModel):
+    prescription_id: str
+    medicines: list[dict]
+
+@app.post("/pharmacy/drug-interaction")
+async def drug_interaction_endpoint(req: DrugInteractionRequest):
+    return await _drug_interaction_agent.check(req.prescription_id, req.medicines)
+
+
+class LeadScoringRequest(BaseModel):
+    budget_vnd: float
+    interaction_count: int
+    source: str
+    property_type: Optional[str] = None
+    urgency: Optional[str] = "medium"
+
+@app.post("/real-estate/lead-score")
+async def lead_scoring_endpoint(req: LeadScoringRequest):
+    return _lead_scoring_agent.score(req.model_dump())
+
+
+class RouteStop(BaseModel):
+    id: str
+    address: str
+    recipient_name: Optional[str] = None
+
+class RouteOptimizationRequest(BaseModel):
+    stops: list[RouteStop]
+
+@app.post("/logistics/route-optimize")
+async def route_optimization_endpoint(req: RouteOptimizationRequest):
+    return _route_optimizer_agent.optimize([s.model_dump() for s in req.stops])
+
+
+class DemandForecastRequest(BaseModel):
+    historical_sales: list[float]
+    horizon: Optional[int] = 7
+
+@app.post("/retail-fnb/demand-forecast")
+async def demand_forecast_endpoint(req: DemandForecastRequest):
+    return _demand_forecasting_agent.forecast(req.historical_sales, req.horizon)
+
+
+class DynamicPricingRequest(BaseModel):
+    base_price: float
+    occupancy_rate: float
+    competitor_price: float
+    is_weekend: Optional[bool] = False
+
+@app.post("/hospitality/dynamic-price")
+async def dynamic_pricing_endpoint(req: DynamicPricingRequest):
+    return _dynamic_pricing_agent.calculate_price(
+        req.base_price,
+        req.occupancy_rate,
+        req.competitor_price,
+        req.is_weekend
+    )
 
 
 if __name__ == "__main__":

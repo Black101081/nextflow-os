@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
@@ -419,32 +419,91 @@ pub async fn route_work_item(
     Ok(Json(res))
 }
 
-// GET /api/v1/queues — Lấy danh sách tất cả Queues của Tenant
+// GET /api/v1/queues?category=<category> — Lấy danh sách Queues của Tenant, hỗ trợ filter theo category
+#[derive(Debug, Deserialize)]
+pub struct GetQueuesQuery {
+    pub category: Option<String>,
+}
+
 pub async fn get_queues(
     State(state): State<AppState>,
     tenant: TenantIsolation,
+    Query(params): Query<GetQueuesQuery>,
 ) -> Result<impl IntoResponse, Response> {
-    let rows = sqlx::query(
-        "SELECT id, name, category, routing_algorithm, sla_target_seconds, created_at FROM nf_core.queues WHERE tenant_id = $1 ORDER BY created_at DESC"
-    )
-    .bind(tenant.tenant_id)
-    .fetch_all(&state.pool)
-    .await
+    // Build SQL with optional category filter
+    let rows = if let Some(ref cat) = params.category {
+        sqlx::query(
+            r#"SELECT id, name, category, routing_algorithm, sla_target_seconds, created_at
+               FROM nf_core.queues
+               WHERE tenant_id = $1 AND category = $2
+               ORDER BY created_at DESC"#
+        )
+        .bind(tenant.tenant_id)
+        .bind(cat)
+        .fetch_all(&state.pool)
+        .await
+    } else {
+        sqlx::query(
+            r#"SELECT id, name, category, routing_algorithm, sla_target_seconds, created_at
+               FROM nf_core.queues
+               WHERE tenant_id = $1
+               ORDER BY created_at DESC"#
+        )
+        .bind(tenant.tenant_id)
+        .fetch_all(&state.pool)
+        .await
+    }
     .map_err(|err| {
         eprintln!("[Queue] Fetch queues error: {}", err);
         (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": { "code": "SYSTEM_FAULT", "message": "Lỗi máy chủ." } }))).into_response()
     })?;
 
-    let queues: Vec<serde_json::Value> = rows.iter().map(|row| {
-        json!({
-            "id": row.get::<String, _>("id"),
+    // For each queue, fetch pending_count, sla_breach_count, avg_age_minutes
+    let mut queues: Vec<serde_json::Value> = Vec::new();
+    for row in &rows {
+        let queue_id: String = row.get("id");
+        let sla_target: i32 = row.get("sla_target_seconds");
+
+        // Count pending (UNASSIGNED + IN_PROGRESS) work items
+        let count_row = sqlx::query(
+            r#"SELECT
+                COUNT(*) FILTER (WHERE status IN ('UNASSIGNED', 'IN_PROGRESS')) AS pending_count,
+                COUNT(*) FILTER (WHERE status IN ('UNASSIGNED', 'IN_PROGRESS')
+                    AND EXTRACT(EPOCH FROM (NOW() - created_at)) > $2) AS sla_breach_count,
+                COALESCE(AVG(EXTRACT(EPOCH FROM (NOW() - created_at)) / 60.0)
+                    FILTER (WHERE status IN ('UNASSIGNED', 'IN_PROGRESS')), 0) AS avg_age_minutes
+               FROM nf_core.work_items
+               WHERE queue_id = $1 AND tenant_id = $3"#
+        )
+        .bind(&queue_id)
+        .bind(sla_target as f64)
+        .bind(tenant.tenant_id)
+        .fetch_one(&state.pool)
+        .await;
+
+        let (pending_count, sla_breach_count, avg_age_minutes) = match count_row {
+            Ok(cr) => (
+                cr.try_get::<i64, _>("pending_count").unwrap_or(0),
+                cr.try_get::<i64, _>("sla_breach_count").unwrap_or(0),
+                cr.try_get::<f64, _>("avg_age_minutes").unwrap_or(0.0),
+            ),
+            Err(_) => (0i64, 0i64, 0.0f64),
+        };
+
+
+        queues.push(json!({
+            "id": queue_id,
             "name": row.get::<String, _>("name"),
             "category": row.get::<String, _>("category"),
             "routing_algorithm": row.get::<String, _>("routing_algorithm"),
-            "sla_target_seconds": row.get::<i32, _>("sla_target_seconds"),
-            "created_at": row.get::<chrono::DateTime<Utc>, _>("created_at")
-        })
-    }).collect();
+            "sla_target_seconds": sla_target,
+            "created_at": row.get::<chrono::DateTime<Utc>, _>("created_at"),
+            "pending_count": pending_count,
+            "sla_breach_count": sla_breach_count,
+            "avg_age_minutes": (avg_age_minutes * 10.0).round() / 10.0,
+            "description": ""
+        }));
+    }
 
     Ok(Json(json!({ "queues": queues })))
 }

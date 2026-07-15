@@ -1,0 +1,109 @@
+{
+    "id": "tpl_logistics",
+    "name": "Logistics & Delivery Pack",
+    "description": "Tối ưu hóa vận hành cho doanh nghiệp Vận tải, Chuyển phát nhanh. Quản lý điều vận, phân công chặng cuối và đối soát COD.",
+    "category": "logistics",
+    "policies": [
+        {
+            "name": "SLA - Thu gom đơn hàng",
+            "description": "Đơn hàng nội thành phải được shipper thu gom trong vòng 2 giờ.",
+            "target_type": "response_time",
+            "target_value": "120",
+            "action": "escalate"
+        }
+    ],
+    "queues": [
+        {
+            "name": "Giao hàng chặng cuối (Last-mile)",
+            "description": "Shipper nhận hàng tại bưu cục và giao tới tận tay khách hàng",
+            "priority": 1,
+            "color": "amber",
+            "icon": "Truck"
+        }
+    ],
+    "sops": [
+        {
+            "title": "Quy trình Thu gom & Phân loại",
+            "content": "## 1. Nhận hàng tại shop\n- Kiểm tra tình trạng niêm phong của hộp hàng.\n- Cân trọng lượng và đo kích thước thùng hàng thực tế.\n## 2. Quét mã vạch nhập kho\n- Sử dụng app điện thoại quét mã vạch để cập nhật trạng thái đã lấy hàng."
+        }
+    ],
+    "connectors": [],
+    "entities": [
+        {
+            "name": "Đơn vận chuyển",
+            "system_name": "delivery_order",
+            "description": "Thông tin chi tiết vận đơn giao hàng",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "trackingNo": {
+                        "type": "string"
+                    },
+                    "deliveryAddress": {
+                        "type": "string"
+                    },
+                    "codAmount": {
+                        "type": "number"
+                    }
+                }
+            }
+        }
+    ],
+    "workflows": [
+        {
+            "name": "Order Delivery Flow",
+            "trigger_event": "entity.delivery_order.created",
+            "dag": {
+                "workflow_id": "00000000-0000-0000-0000-000000000008",
+                "nodes": [
+                    {
+                        "id": "trigger",
+                        "name": "Khi tạo vận đơn mới",
+                        "type": "Trigger",
+                        "event_name": "entity.delivery_order.created"
+                    },
+                    {
+                        "id": "ai_route",
+                        "name": "AI tối ưu lộ trình giao hàng chặng cuối",
+                        "type": "AiPredict",
+                        "model": "gemini-1.5-flash",
+                        "prompt_template": "Dựa trên địa chỉ giao hàng '{{payload.deliveryAddress}}', đề xuất thứ tự giao hàng tối ưu nhiên liệu nhất."
+                    },
+                    {
+                        "id": "blockchain_anchor",
+                        "name": "Neo chữ ký số bàn giao hàng lên Blockchain",
+                        "type": "BlockchainAnchor",
+                        "data_payload": {
+                            "tracking_no": "{{payload.trackingNo}}",
+                            "status": "DELIVERED"
+                        }
+                    },
+                    {
+                        "id": "zalo_send",
+                        "name": "Gửi tin nhắn thông báo mã OTP nhận hàng",
+                        "type": "ZaloZNSNode",
+                        "phone_number": "{{payload.customer_phone}}",
+                        "template_id": "delivery_otp",
+                        "template_data": {
+                            "tracking_no": "{{payload.trackingNo}}"
+                        }
+                    }
+                ],
+                "edges": [
+                    {
+                        "source_id": "trigger",
+                        "target_id": "ai_route"
+                    },
+                    {
+                        "source_id": "ai_route",
+                        "target_id": "blockchain_anchor"
+                    },
+                    {
+                        "source_id": "blockchain_anchor",
+                        "target_id": "zalo_send"
+                    }
+                ]
+            }
+        }
+    ]
+}

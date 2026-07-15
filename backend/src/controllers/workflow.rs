@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
@@ -27,6 +27,11 @@ pub struct CreateWorkflowRequest {
     pub name: String,
     pub trigger_event: String,
     pub dag_json: Value,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ToggleWorkflowRequest {
+    pub is_active: bool,
 }
 
 
@@ -57,7 +62,7 @@ pub async fn get_workflows(
                 is_active: r.get("is_active"),
                 created_at: r.get("created_at"),
             }).collect();
-            (StatusCode::OK, Json(workflows)).into_response()
+            (StatusCode::OK, Json(serde_json::json!({ "data": workflows }))).into_response()
         },
         Err(e) => {
             (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response()
@@ -88,9 +93,46 @@ pub async fn create_workflow(
     match row {
         Ok(r) => {
             let workflow_id: Uuid = r.get("id");
+            // Reload cache
+            let _ = crate::services::workflow_engine::reload_all_workflows(&state.pool).await;
             (StatusCode::CREATED, Json(serde_json::json!({
                 "status": "success",
                 "workflow_id": workflow_id
+            }))).into_response()
+        },
+        Err(e) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": e.to_string()}))).into_response()
+        }
+    }
+}
+
+/// Bật tắt một Workflow DAG
+pub async fn toggle_workflow(
+    State(state): State<AppState>,
+    tenant: TenantIsolation,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<ToggleWorkflowRequest>,
+) -> Response {
+    let query = r#"
+        UPDATE nf_meta.workflow_definitions
+        SET is_active = $1, updated_at = NOW()
+        WHERE id = $2 AND tenant_id = $3
+    "#;
+
+    let result = sqlx::query(query)
+        .bind(payload.is_active)
+        .bind(id)
+        .bind(tenant.tenant_id)
+        .execute(&state.pool)
+        .await;
+
+    match result {
+        Ok(_) => {
+            // Reload cache
+            let _ = crate::services::workflow_engine::reload_all_workflows(&state.pool).await;
+            (StatusCode::OK, Json(serde_json::json!({
+                "status": "success",
+                "message": if payload.is_active { "Đã kích hoạt Workflow" } else { "Đã tạm dừng Workflow" }
             }))).into_response()
         },
         Err(e) => {

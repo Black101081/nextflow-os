@@ -1,0 +1,110 @@
+{
+    "id": "tpl_pharmacy",
+    "name": "Pharmacy & Healthcare Pack",
+    "description": "Giải pháp cho nhà thuốc, phòng mạch tư nhân. Quản lý lịch khám bệnh nhân, tự động gửi nhắc lịch uống thuốc định kỳ.",
+    "category": "healthcare",
+    "policies": [
+        {
+            "name": "SLA - Kê đơn phát thuốc",
+            "description": "Dược sĩ phải chuẩn bị và phát thuốc cho bệnh nhân trong vòng 10 phút.",
+            "target_type": "response_time",
+            "target_value": "10",
+            "action": "escalate"
+        }
+    ],
+    "queues": [
+        {
+            "name": "Phát thuốc & Thanh toán",
+            "description": "Soạn thuốc theo đơn của bác sĩ kê và hướng dẫn liều dùng",
+            "priority": 1,
+            "color": "pink",
+            "icon": "Activity"
+        }
+    ],
+    "sops": [
+        {
+            "title": "Tiêu chuẩn Phát thuốc An toàn",
+            "content": "## 1. Xác minh đơn thuốc\n- Đối chiếu họ tên bệnh nhân, tuổi tác trên đơn khám với thông tin thực tế.\n- Đảm bảo các loại thuốc không có tương tác gây hại nặng.\n## 2. Đóng gói & Dán nhãn\n- Cho thuốc vào các túi zipper phân biệt sáng, trưa, tối.\n- Ghi rõ liều lượng và ghi chú trước/sau ăn lên nhãn túi."
+        }
+    ],
+    "connectors": [],
+    "entities": [
+        {
+            "name": "Đơn thuốc điện tử",
+            "system_name": "prescription",
+            "description": "Đơn thuốc được kê bởi bác sĩ phụ trách",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "prescriptionId": {
+                        "type": "string"
+                    },
+                    "patientName": {
+                        "type": "string"
+                    },
+                    "doctorName": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    ],
+    "workflows": [
+        {
+            "name": "Prescription Dispensation Flow",
+            "trigger_event": "entity.prescription.created",
+            "dag": {
+                "workflow_id": "00000000-0000-0000-0000-000000000010",
+                "nodes": [
+                    {
+                        "id": "trigger",
+                        "name": "Khi có đơn thuốc mới",
+                        "type": "Trigger",
+                        "event_name": "entity.prescription.created"
+                    },
+                    {
+                        "id": "ai_check",
+                        "name": "AI kiểm tra xung đột tác dụng phụ của thuốc",
+                        "type": "AiPredict",
+                        "model": "gemini-1.5-flash",
+                        "prompt_template": "Kiểm tra đơn thuốc ID '{{payload.prescriptionId}}' kê bởi Bác sĩ '{{payload.doctorName}}' để phát hiện xung đột dược lý tiềm ẩn."
+                    },
+                    {
+                        "id": "blockchain_anchor",
+                        "name": "Lưu lịch sử khám bệnh lên Blockchain bảo mật",
+                        "type": "BlockchainAnchor",
+                        "data_payload": {
+                            "prescription_id": "{{payload.prescriptionId}}",
+                            "doctor_name": "{{payload.doctorName}}"
+                        }
+                    },
+                    {
+                        "id": "zalo_send",
+                        "name": "Gửi tin nhắn ZNS nhắc nhở liều dùng",
+                        "type": "ZaloZNSNode",
+                        "phone_number": "{{payload.customer_phone}}",
+                        "template_id": "med_remind",
+                        "template_data": {
+                            "patient_name": "{{payload.patientName}}",
+                            "prescription_id": "{{payload.prescriptionId}}"
+                        }
+                    }
+                ],
+                "edges": [
+                    {
+                        "source_id": "trigger",
+                        "target_id": "ai_check"
+                    },
+                    {
+                        "source_id": "ai_check",
+                        "target_id": "blockchain_anchor"
+                    },
+                    {
+                        "source_id": "blockchain_anchor",
+                        "target_id": "zalo_send"
+                    }
+                ]
+            }
+        }
+    ]
+}

@@ -1,5 +1,6 @@
 -- 004_sme_policies_templates.sql
 -- Create policy configuration and template pack tables in nf_core schema
+SET client_encoding = 'UTF8';
 
 -- 1. Bảng lưu trữ cấu hình chính sách của từng Tenant
 CREATE TABLE IF NOT EXISTS nf_core.tenant_policies (

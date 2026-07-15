@@ -202,13 +202,40 @@ pub async fn generate_daily_report(
     });
 
     // 2. Tự động sinh AI Insights
-    let ai_insights = if total_tasks > 0 && sla_violations > 0 {
-        format!("Cảnh báo từ AI: Có {} tác vụ vi phạm SLA. Cần bổ sung thêm nhân sự xử lý để giải quyết tình trạng nghẽn cổ chai (bottleneck) đang xảy ra.", sla_violations)
-    } else if total_tasks > 0 {
-        "Phân tích AI: Hiệu suất vận hành trong ngày đạt mức xuất sắc. Toàn bộ các tác vụ đều hoàn thành đúng thời hạn SLA cam kết.".to_string()
+    let mut ai_insights = "Đang xử lý phân tích AI...".to_string();
+    if total_tasks == 0 {
+        ai_insights = "AI: Hệ thống chưa ghi nhận dữ liệu giao dịch hoặc tác vụ nào trong ngày hôm nay. Đề xuất kiểm tra lại các nguồn thu thập (KiotViet/Zalo) để đảm bảo kết nối ổn định.".to_string();
     } else {
-        "Phân tích AI: Chưa có dữ liệu tác vụ nào được ghi nhận trong hệ thống ngày hôm nay.".to_string()
-    };
+        let ai_service_url = std::env::var("AI_SERVICE_URL").unwrap_or_else(|_| "http://ai-service:8001".to_string());
+        let client = reqwest::Client::new();
+        
+        let ai_req = json!({
+            "tenant_id": tenant.tenant_id,
+            "metrics": metrics_json
+        });
+
+        let res = client.post(&format!("{}/api/v1/ai/generate-insights", ai_service_url))
+            .json(&ai_req)
+            .send()
+            .await;
+            
+        match res {
+            Ok(response) => {
+                #[derive(serde::Deserialize)]
+                struct AiInsightsResponse {
+                    insights: String,
+                }
+                if let Ok(data) = response.json::<AiInsightsResponse>().await {
+                    ai_insights = data.insights;
+                } else {
+                    ai_insights = "AI (Fallback): Không thể parse dữ liệu phân tích từ AI Service.".to_string();
+                }
+            },
+            Err(_) => {
+                ai_insights = "AI (Fallback): Kết nối tới AI Service thất bại.".to_string();
+            }
+        }
+    }
 
     // 3. Tính toán Data Hash (Hash(metrics + insights))
     let payload_to_hash = format!("{}:{}", metrics_json.to_string(), ai_insights);
@@ -217,7 +244,7 @@ pub async fn generate_daily_report(
     let data_hash = format!("0x{}", hex::encode(hasher.finalize()));
 
     // 4. Gọi hàm Neo dữ liệu lên Blockchain giả lập
-    let tx_hash = anchor_data_on_chain(&data_hash).await;
+    let tx_hash = anchor_data_on_chain(&state.pool, tenant.tenant_id, &data_hash, &serde_json::json!({"metrics": metrics_json, "insights": ai_insights})).await;
 
     // 5. Lưu xuống DB
     let _result = sqlx::query(r#"
